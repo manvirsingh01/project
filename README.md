@@ -20,6 +20,9 @@ node cli/pqc-iot-sim.js devices list
 node cli/pqc-iot-sim.js matrix
 node cli/pqc-iot-sim.js matrix --export pdf --out devices-report.pdf --algo ml-kem-512 --metric energy
 node cli/pqc-iot-sim.js states --algo ml-kem --device-type catalog
+node cli/pqc-iot-sim.js export --out pqc-iot-data.csv
+node cli/pqc-iot-sim.js export --format pdf --numbers-only --out pqc-iot-data.pdf
+node cli/pqc-iot-sim.js references
 node cli/pqc-iot-sim.js simulate --device rp2040 --algo ml-kem-512
 node cli/pqc-iot-sim.js network --algo ml-dsa-44 --link 802.15.4 --hops 1 --loss 0.02
 node cli/pqc-iot-sim.js compare --device rp2040,stm32f4-disco --algo ml-kem-512 --json
@@ -38,7 +41,9 @@ The benchmark cache is capped at 500 in-process results. CLI runs may persist re
 
 - `core/index.js` contains the shared projection, MWC, and network functions.
 - `benchmark-data/index.js` holds the source-tagged data used by both front ends. `null` means the supplied notes contain no numeric value.
+- `benchmark-data/references.js` maintains the standards, research-source groups, build-technology status, and document crosswalk shown on the combined Method & sources page.
 - `core/deviceCatalog.js` builds per-device algorithm results, the MWC state matrix, and the shared PDF report used by the browser and CLI.
+- `core/dataExport.js` builds the shared operation-level dataset and serializes it as flat CSV/JSON or a numbers-only paginated PDF.
 - The States dashboard consolidates the live matrix, projections, network fragmentation, variance, and per-cell details in one view; matching CLI filters are available through `states`.
 - `web/` contains the browser interface and interactions.
 - `cli/` contains the Node command line.
@@ -48,4 +53,4 @@ The benchmark cache is capped at 500 in-process results. CLI runs may persist re
 
 Time scales linearly from Cortex-M0+ @133 MHz anchors; Cortex-M4/M7 performance uses the documented 1.85× factor. Unknown reference clock speeds use a labeled 133 MHz assumption. Stack is copied from the available anchor, and energy scales only when both time and energy anchors exist. Network loss assumes independent packet loss. LoRa frame capacity defaults to a configurable 51-byte modeling assumption because the supplied notes do not specify one. Read **Method & sources** in the web app for details and the MWC rule.
 
-The repository contains design and implementation Markdown, but no source PDFs or numbered bibliography. The in-app report therefore cites the supplied design notes and does not fabricate source references.
+The repository contains a grouped numbered reference index, but not the original source report, source PDFs, full bibliography URLs, or anchor-level paper mapping. The combined Method & sources page flags those limits instead of guessing missing citations.

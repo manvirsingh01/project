@@ -129,3 +129,31 @@ test("CSV output has a header and Markdown report includes all ten topic heading
   assert.equal(version.status, 0);
   assert.match(version.stdout, /data 1\.2\.0.*engine 1\.2\.0/);
 });
+
+test("references command prints the repository reference guide", () => {
+  const result = runCli(["references"]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Cryptographic standards modeled/);
+  assert.match(result.stdout, /Technology used to build the app itself/);
+});
+
+test("raw export writes matching operation-level CSV, JSON, and numbers-only PDF", () => {
+  const csvPath = join(tempHome, "pqc-iot-data.csv");
+  const jsonPath = join(tempHome, "pqc-iot-data.json");
+  const pdfPath = join(tempHome, "pqc-iot-data.pdf");
+  const csv = runCli(["export", "--out", csvPath]);
+  assert.equal(csv.status, 0, csv.stderr);
+  const json = runCli(["export", "--format", "json", "--out", jsonPath]);
+  assert.equal(json.status, 0, json.stderr);
+  const rows = JSON.parse(readFileSync(jsonPath, "utf8"));
+  assert.equal(rows.length, new Set(rows.map((row) => row.device_id)).size * 23);
+  assert.equal(rows.find((row) => row.device_id === "rp2040" && row.algo_id === "ml-kem-512" && row.operation === "full_handshake").time_ms, 35.7);
+  const csvLines = readFileSync(csvPath, "utf8").trimEnd().split("\n");
+  assert.match(csvLines[0], /device_id.*operation.*time_ms.*source_citation.*note/);
+  assert.equal(csvLines.length - 1, rows.length);
+  const pdf = runCli(["export", "--format", "pdf", "--numbers-only", "--out", pdfPath]);
+  assert.equal(pdf.status, 0, pdf.stderr);
+  const pdfText = readFileSync(pdfPath).toString("latin1");
+  assert.match(pdfText, /^%PDF-1\.4/);
+  assert.doesNotMatch(pdfText, /\/XObject|\/Image/);
+});

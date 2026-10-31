@@ -2,9 +2,11 @@
 import { appendFile, readFile, writeFile, mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { algorithms, DATA_VERSION, ENGINE_VERSION, devices, getAlgorithm, getDevice, makeCustomDevice, modelNetwork, networkCacheKey, simulationCacheKey, simulate } from "../core/index.js";
 import { networkAlerts, regressionAlert, simulationAlerts } from "../core/alerts.js";
 import { createCatalogPdf, generateDeviceCatalog, generateStateMatrix, getFullMatrix } from "../core/deviceCatalog.js";
+import { createNumbersOnlyPdf, getOperationLevelData, operationDataToCsv } from "../core/dataExport.js";
 
 const args = process.argv.slice(2);
 const command = args.shift();
@@ -173,7 +175,11 @@ The shared core uses a 500-entry LRU cache. The CLI persists calculation results
 
 Alerts identify infeasible and marginal MWC cases, p99 above the watchdog threshold, network success below 0.8, fragmentation above 20 frames, confidence drops, and recorded-time regressions. Browser/CLI/webhook notifications do not alter model results.
 
-Source notes: 01-DESIGN.md §§4.1–4.4, 02-IMPLEMENTATION.md §§3 and 6, 05-BENCHMARKING.md. Source PDFs and a numbered bibliography were not present in this checkout.
+## References and provenance
+
+The repository includes 08-REFERENCES.md and a grouped citation index in benchmark-data/references.js. The original research report, full bibliography URLs, and exact per-anchor paper mapping are not in this checkout. The References view distinguishes implemented runtime technology from tools/frameworks mentioned only by the source notes.
+
+Source notes: 01-DESIGN.md §§4.1–4.4, 02-IMPLEMENTATION.md §§3 and 6, 05-BENCHMARKING.md, 08-REFERENCES.md.
 `;
 
 const help = `PQC-on-IoT Simulator
@@ -189,6 +195,9 @@ Commands:
   compare --device ID[,ID...] --algo ID[,ID...] [--json|--csv] [--strict] [--no-cache] [--webhook URL]
   history [--device ID] [--algo ID]
   report [--format md]
+  references
+  export [--format csv|json] --out FILE (operation-level raw dataset; CSV default)
+  export --format pdf --numbers-only --out FILE (plain paginated table)
   export --device ID[,ID...] --algo ID[,ID...] --format csv|json [--out FILE]
   --version
 
@@ -263,6 +272,23 @@ try {
     if (opt.json) json({ ...result, alerts }); else render([result], opt.csv ? "csv" : "table");
     writeAlerts(alerts);
     exitForAlerts(alerts);
+  } else if (command === "export" && ((!opt.device && !opt.algo) || opt["numbers-only"] || opt.format === "pdf")) {
+    if (Boolean(opt.device) !== Boolean(opt.algo)) throw new Error("Use both --device and --algo for scenario export, or omit both for the operation-level dataset.");
+    const format = opt.format || (opt["numbers-only"] ? "pdf" : "csv"), rawRows = getOperationLevelData([...devices, ...await customDevices()]);
+    if (opt["numbers-only"] && (opt.device || opt.algo)) throw new Error("Numbers-only PDF export covers the full operation-level dataset; omit --device and --algo.");
+    let output;
+    if (format === "csv" && !opt["numbers-only"]) output = operationDataToCsv(rawRows);
+    else if (format === "json" && !opt["numbers-only"]) output = `${JSON.stringify(rawRows, null, 2)}\n`;
+    else if (format === "pdf" && opt["numbers-only"]) {
+      if (!opt.out) throw new Error("Numbers-only PDF export requires --out FILE.");
+      const bytes = createNumbersOnlyPdf(rawRows, { dataVersion: DATA_VERSION, engineVersion: ENGINE_VERSION });
+      await mkdir(dirname(opt.out), { recursive: true }); await writeFile(opt.out, bytes);
+      process.stdout.write(`Numbers-only data PDF written to ${opt.out} (${rawRows.length} rows).\n`);
+    } else throw new Error("Raw export formats are csv, json, or pdf with --numbers-only.");
+    if (output !== undefined) {
+      if (opt.out) { await mkdir(dirname(opt.out), { recursive: true }); await writeFile(opt.out, output); }
+      else process.stdout.write(output);
+    }
   } else if (command === "compare" || command === "export") {
     const deviceIds = requireOption("device").split(","), algoIds = requireOption("algo").split(",");
     const pairs = deviceIds.length === 1 ? algoIds.map((algo) => ({ device: deviceIds[0], algo })) : algoIds.length === 1 ? deviceIds.map((device) => ({ device, algo: algoIds[0] })) : deviceIds.map((device, i) => ({ device, algo: algoIds[i] }));
@@ -303,6 +329,9 @@ try {
     const records = await loadHistory();
     const filtered = records.filter((entry) => (!opt.device || entry.deviceId === opt.device) && (!opt.algo || entry.algoId === opt.algo));
     table(filtered, [{ name: "Timestamp", value: (r) => r.timestamp }, { name: "Device", value: (r) => r.deviceId }, { name: "Algorithm", value: (r) => r.algoId }, { name: "Mean ms", value: (r) => r.result.estimatedTimeMs ?? "Not available" }, { name: "Tier", value: (r) => r.result.confidenceTier }]);
+  } else if (command === "references") {
+    const referenceFile = fileURLToPath(new URL("../08-REFERENCES.md", import.meta.url));
+    process.stdout.write(await readFile(referenceFile, "utf8"));
   } else if (command === "report") {
     if (opt.format && opt.format !== "md") throw new Error("Only --format md is supported.");
     process.stdout.write(`${report}\n---\n${formatVersion()}\n`);

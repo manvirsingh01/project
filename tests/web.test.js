@@ -20,6 +20,15 @@ test("browser app is offline-capable and exposes every documented view", () => {
   assert.match(html, /prefers-color-scheme:\s*dark/);
 });
 
+test("Method & sources page combines methodology and reference sections", () => {
+  for (const id of ["view-report", "reference-project-sources", "reference-standards", "reference-tools", "reference-works", "reference-crosswalk", "reference-technologies", "reference-documents"]) assert.match(html, new RegExp(`id="${id}"`));
+  assert.doesNotMatch(html, /id="view-references"|data-view="references"/);
+  assert.ok(html.indexOf("id=\"view-report\"") < html.indexOf("id=\"reference-project-sources\""));
+  assert.match(app, /from "\.\.\/benchmark-data\/references\.js"/);
+  assert.match(app, /function renderReferences\(\)/);
+  assert.match(html, /anchor-to-paper mappings are left explicit/);
+});
+
 test("simulator, network, and playground use the shared core and animation honors reduced motion", () => {
   assert.match(app, /from "\.\.\/core\/index\.js"/);
   assert.match(app, /from "\.\.\/core\/alerts\.js"/);
@@ -41,9 +50,11 @@ test("device catalog matrix and browser PDF export are wired to shared catalog f
   assert.match(app, /generateDeviceCatalog\(customs\)/);
 });
 
-test("states dashboard exposes all comparison sections and shared full-matrix rendering", () => {
-  for (const id of ["view-states", "states-algo-filter", "states-summary", "states-matrix", "states-time-chart", "states-ram-chart", "states-energy-chart", "states-network-chart", "states-variance-chart", "states-export-pdf"]) assert.match(html, new RegExp(`id="${id}"`));
+test("states dashboard exposes comparisons and raw operation-level exports", () => {
+  for (const id of ["view-states", "states-algo-filter", "states-summary", "states-matrix", "states-time-chart", "states-ram-chart", "states-energy-chart", "states-network-chart", "states-variance-chart", "states-export-pdf", "states-export-numbers-pdf", "states-export-csv", "states-export-json"]) assert.match(html, new RegExp(`id="${id}"`));
   assert.match(app, /getFullMatrix\(selected, algoList\)/);
+  assert.match(app, /getOperationLevelData\(allDevices\(\)\)/);
+  assert.match(app, /createNumbersOnlyPdf/);
   assert.match(app, /renderStateDetail/);
   assert.match(app, /downloadChartPng/);
   assert.match(app, /renderStatesDashboard\(\)/);

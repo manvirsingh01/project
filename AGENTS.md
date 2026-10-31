@@ -2,7 +2,7 @@
 
 ## Project Structure
 
-`core/index.js` is the shared estimator used by both interfaces; `core/deviceCatalog.js` builds the matrix and PDF data. Source-tagged reference data lives in `benchmark-data/index.js`. The browser app is under `web/`; its consolidated States dashboard is in `web/index.html` and `web/app.js`. The Node CLI is `cli/pqc-iot-sim.js`. Numbered Markdown files define feature behavior. Keep algorithm values in the data module rather than duplicating them in either interface.
+`core/index.js` is the shared estimator used by both interfaces; `core/deviceCatalog.js` builds matrix and PDF data. Benchmark data and its source index live in `benchmark-data/`. The browser app is under `web/`; its States dashboard and combined Method & sources page are in `web/index.html` and `web/app.js`. The Node CLI is `cli/pqc-iot-sim.js`. Numbered Markdown files define feature behavior. Keep algorithm values in the data module rather than duplicating them in either interface.
 
 ## Development Commands
 
@@ -10,6 +10,7 @@
 - `node cli/pqc-iot-sim.js help` lists CLI commands.
 - `npm run cli -- simulate --device rp2040 --algo ml-kem-512` runs a projection.
 - `node cli/pqc-iot-sim.js states --algo ml-kem --device-type catalog` prints a filtered matrix; add `--json` or `--export pdf --out states.pdf` for exports.
+- `node cli/pqc-iot-sim.js export --out pqc-iot-data.csv` writes the flat operation dataset (CSV by default); use `--format json` or `--format pdf --numbers-only` for other formats.
 - `npm run check` checks JavaScript syntax in the shared core, CLI, and browser code.
 - `npm test` runs the data, engine, CLI, and browser-surface test suites.
 - `npm run test:data`, `npm run test:core`, and `npm run test:cli` run focused suites.

@@ -57,6 +57,7 @@ test("browser surfaces and Playground flows stay wired to live core results", { 
 
   await page.locator('[data-view="states"]').click();
   assert.ok(await page.locator("#states-matrix tbody tr").count() >= 10);
+  for (const button of ["states-export-numbers-pdf", "states-export-csv", "states-export-json"]) assert.equal(await page.locator(`#${button}`).count(), 1);
   assert.match(await page.locator("#states-summary").innerText(), /Reliable/);
   await page.locator("#states-matrix .state-cell").first().click();
   assert.match(await page.locator("#states-detail").innerText(), /MWC state/);

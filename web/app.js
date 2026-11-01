@@ -3,6 +3,7 @@ import { networkAlerts, simulationAlerts } from "../core/alerts.js";
 import { createCatalogPdf, generateDeviceCatalog, generateStateMatrix, getFullMatrix } from "../core/deviceCatalog.js";
 import { documentMap, projectSources, researchTools, sourceCrosswalk, standards, technologies, worksCited } from "../benchmark-data/references.js";
 import { createNumbersOnlyPdf, getOperationLevelData, operationDataToCsv } from "../core/dataExport.js";
+import { MWC_THRESHOLDS } from "../core/mwcRules.js";
 import { wokwiBoards } from "../benchmark-data/wokwi.js";
 import { getWokwiResult, importWokwiResult, listWokwiResults, parseWokwiSerial } from "../core/wokwi.js";
 
@@ -278,8 +279,8 @@ function pgResultMarkup(resultA, resultB, networkResult, algo, relayAssessment =
     ["Energy A / B", `${tierFormat(resultA, resultA.estimatedEnergyMJ, " mJ", 2)} / ${tierFormat(resultB, resultB.estimatedEnergyMJ, " mJ", 2)}`],
     ["Network", networkResult ? `${networkResult.fragmentCount} frame${networkResult.fragmentCount === 1 ? "" : "s"} · ${format(networkResult.successProbability * 100, "%", 1)} success` : "Payload size unavailable"]
   ];
-  const lowerRam = [resultA, resultB].find((r) => r.estimatedStackKB != null && r.estimatedStackKB > r.device.ramKB);
-  const reason = lowerRam ? `${algo.name} estimated stack (${format(lowerRam.estimatedStackKB, " KB")}) exceeds ${lowerRam.device.name} total RAM (${lowerRam.device.ramKB} KB).` : relayAssessment?.verdict === "infeasible" ? `Relay ${relayAssessment.device.name} is infeasible: ${relayAssessment.reasons.join(" ")}` : [...resultA.mwcReasons, ...resultB.mwcReasons].join(" ");
+  const lowerRam = [resultA, resultB].find((r) => r.estimatedStackKB != null && r.device.ramKB < r.estimatedStackKB * MWC_THRESHOLDS.stackHeadroomRatio);
+  const reason = lowerRam ? `${algo.name} estimated stack (${format(lowerRam.estimatedStackKB, " KB")}) leaves less than 20% headroom in ${lowerRam.device.name} RAM (${lowerRam.device.ramKB} KB).` : relayAssessment?.verdict === "infeasible" ? `Relay ${relayAssessment.device.name} is infeasible: ${relayAssessment.reasons.join(" ")}` : [...resultA.mwcReasons, ...resultB.mwcReasons].join(" ");
   const relayLabel = relayAssessment ? ` · relay ${esc(relayAssessment.verdict)}` : "";
   return `<div class="pg-result-mark">${networkResult && networkResult.fragmentCount > 1 ? "▦" : "◇"}</div><div><b>${esc(algo.name)} exchange · ${resultA.mwcVerdict === "reliable" && resultB.mwcVerdict === "reliable" ? "both endpoints reliable" : `${esc(resultA.mwcVerdict)} / ${esc(resultB.mwcVerdict)}`}${relayLabel}</b><p title="${esc(resultA.confidenceReason)}">${esc(reason || "Projection complete.")} · Confidence: ${esc(resultA.confidenceTier)} / ${esc(resultB.confidenceTier)}</p><div class="pg-metrics">${metrics.map(([label, value]) => `<span class="pg-metric">${esc(label)} <b>${esc(value)}</b></span>`).join("")}</div>${visibleAlerts.map((alert) => `<div class="notice ${alert.severity === "critical" ? "critical" : "warn"}" role="alert">${esc(alert.message)}</div>`).join("")}</div>`;
 }

@@ -58,7 +58,7 @@ export const technologies = [
   { name: "JavaScript benchmark data module", usage: "Source-tagged device, algorithm, network, and reference records in benchmark-data/.", status: "Used; upstream notes propose JSON files, but this repo uses an ES module." },
   { name: "Built-in PDF writer", usage: "Client-side and CLI PDF generation without a runtime dependency.", status: "Used" },
   { name: "node:test", usage: "Data, core, CLI, and web-surface tests.", status: "Used" },
-  { name: "Wokwi project files", usage: "Optional RP2040 and ATtiny85 illustrative dummy-workload sketches with phase LEDs and serial output.", status: "Used; no PQC library is linked" },
+  { name: "Wokwi project files", usage: "Optional RP2040 and ATtiny85 illustrative dummy-workload sketches with phase LEDs and serial output. Serial parsing and result storage live in core/wokwi.js only.", status: "Used; no PQC library is linked" },
   { name: "TypeScript", usage: "Mentioned by the design notes for a typed engine.", status: "Not integrated; current source is JavaScript." },
   { name: "React / Chart.js", usage: "Optional approaches mentioned in the source notes.", status: "Not integrated; current app uses vanilla JavaScript and SVG." },
   { name: "External runtime packages", usage: "Application dependencies.", status: "None; the project uses built-in platform APIs." }

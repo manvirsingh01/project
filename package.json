@@ -13,6 +13,7 @@
     "test:data": "node --test tests/data.test.js",
     "test:core": "node --test tests/core.test.js",
     "test:cli": "node --test tests/cli.test.js",
+    "test:wokwi": "node --test tests/wokwi.test.js",
     "test:web": "node --test tests/web.test.js tests/browser.test.js"
   }
 }

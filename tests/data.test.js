@@ -40,5 +40,5 @@ test("every algorithm has provenance and all published anchor values stay intact
 
 test("MWC threshold data matches the stated floors", () => {
   assert.equal(DATA_VERSION, "1.2.0");
-  assert.deepEqual(MWC_THRESHOLDS, { minimumClockMHz: 48, kemRamKB: 64, fullAgilityRamKB: 128, minimumFlashKB: 512, recommendedFlashKB: 1024, infeasibleRamRatio: 0.8 });
+  assert.deepEqual(MWC_THRESHOLDS, { minimumClockMHz: 48, kemRamKB: 64, fullAgilityRamKB: 128, minimumFlashKB: 512, recommendedFlashKB: 1024, infeasibleRamRatio: 0.8, stackHeadroomRatio: 1.2 });
 });

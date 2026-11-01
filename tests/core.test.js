@@ -80,6 +80,15 @@ test("confidence tiers distinguish measured, interpolated, extrapolated, and uns
   assert.equal(simulate("rp2040", "lms-h25").confidenceTier, "unsupported");
 });
 
+test("anchor-identical custom devices stay interpolated while renamed reference anchors stay measured", () => {
+  const custom = makeCustomDevice({ name: "RP2040 clone", cpu: "cortex-m0+", ramKB: 264, flashKB: 2048, clockMHz: 133 });
+  assert.equal(simulate(custom, "ml-kem-512").estimatedTimeMs, 35.7);
+  assert.equal(simulate(custom, "ml-kem-512").confidenceTier, "interpolated");
+
+  const renamedReference = { ...board("rp2040"), id: "pico-reference-renamed" };
+  assert.equal(simulate(renamedReference, "ml-kem-512").confidenceTier, "measured");
+});
+
 test("MWC classifies the reference and custom boundary cases", () => {
   assert.equal(classifyDevice(board("cw308-stm32f3"), [algo("ml-dsa-44")]).verdict, "infeasible");
   assert.equal(classifyDevice(board("cw308-stm32f3"), [algo("ml-kem-512")]).verdict, "marginal");

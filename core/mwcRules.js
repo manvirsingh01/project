@@ -4,7 +4,8 @@ export const MWC_THRESHOLDS = Object.freeze({
   fullAgilityRamKB: 128,
   minimumFlashKB: 512,
   recommendedFlashKB: 1024,
-  infeasibleRamRatio: 0.8
+  infeasibleRamRatio: 0.8,
+  stackHeadroomRatio: 1.2
 });
 
 export function classifyDevice(device, requiredAlgos = []) {
@@ -30,7 +31,7 @@ export function classifyDevice(device, requiredAlgos = []) {
     return { verdict: "marginal", reasons: [`RAM ${ramKB} KB is below the ${ramRequired} KB target.`] };
   }
   const peakStackKB = Math.max(0, ...requiredAlgos.map((algo) => Number(typeof algo === "object" ? algo.stackKB : 0)).filter(Number.isFinite));
-  if (peakStackKB && ramKB < peakStackKB * 1.2) {
+  if (peakStackKB && ramKB < peakStackKB * MWC_THRESHOLDS.stackHeadroomRatio) {
     return { verdict: "marginal", reasons: [`RAM ${ramKB} KB leaves less than 20% headroom over the ${peakStackKB} KB peak stack requirement.`] };
   }
   if (flashKB < MWC_THRESHOLDS.minimumFlashKB) {

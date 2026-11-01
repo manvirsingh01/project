@@ -73,7 +73,7 @@ function computeSimulation(device, algo) {
   // 133 MHz as an explicit nominal assumption.
   const targetClock = Number(device.clockMHz) || 133;
   const timeScale = scaleTimeMs({ timeMs: 1, anchorCpu: "cortex-m0+", anchorClockMHz: 133, targetCpu: cpu, targetClockMHz: targetClock });
-  const exactAnchor = device.id === "rp2040" && Number(device.clockMHz) === 133 && hasTimeAnchor;
+  const exactAnchor = device.isReference === true && cpu === "cortex-m0+" && Number(device.clockMHz) === 133 && hasTimeAnchor;
   const estimatedTimeMs = hasTimeAnchor ? algo.timeMs * timeScale : null;
   const estimatedEnergyMJ = Number.isFinite(algo.energyMJ) && hasTimeAnchor ? algo.energyMJ * timeScale : (hasTimeAnchor ? algo.energyMJ : null);
   const estimatedStackKB = algo.stackKB ?? null;

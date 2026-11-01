@@ -11,7 +11,7 @@ const [html, app] = await Promise.all([
 ]);
 
 test("browser app is offline-capable and exposes every documented view", () => {
-  for (const view of ["overview", "devices", "simulator", "playground", "compare", "states", "network", "report"]) {
+  for (const view of ["overview", "devices", "simulator", "playground", "hardware", "compare", "states", "network", "report"]) {
     assert.match(html, new RegExp(`data-view="${view}"`));
     assert.match(html, new RegExp(`id="view-${view}"`));
   }

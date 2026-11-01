@@ -16,7 +16,9 @@ test("browser app is offline-capable and exposes every documented view", () => {
     assert.match(html, new RegExp(`id="view-${view}"`));
   }
   assert.doesNotMatch(html, /<script[^>]+src=["']https?:/i);
-  assert.doesNotMatch(app, /\bfetch\s*\(/);
+  assert.match(app, /new EventSource\(/);
+  assert.match(app, /api\/wokwi\/sessions/);
+  assert.match(html, /id="hw-event-log"/);
   assert.match(html, /prefers-color-scheme:\s*dark/);
 });
 

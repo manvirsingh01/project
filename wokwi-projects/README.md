@@ -1,8 +1,8 @@
 # Wokwi illustrative projects
 
 Both projects use dummy arithmetic loops. They do not link a PQC library, implement cryptography,
-or produce useful performance estimates. Serial lines use `operation,elapsed_ms` and LEDs indicate
-the active phase.
+or produce useful performance estimates. Firmware emits protocol-v1 JSON Lines events; timings use
+the `wokwi-virtual` timer label and must not be treated as physical measurements.
 
 ## Run locally
 
@@ -13,8 +13,9 @@ pio run
 wokwi-cli .
 ```
 
-Wokwi CLI may require a CI token. The Hardware Sim view opens a blank Wokwi board template; copy
-the project's sketch and `diagram.json` there, run it, and paste the serial output into the view.
+Wokwi CLI may require `WOKWI_CLI_TOKEN`. Run `npm run start` and `npm run realtime` in separate
+terminals; Hardware Sim can then start only these local projects and stream their events. Manual
+comma-separated serial import remains available for older logs.
 
 ## Projects
 

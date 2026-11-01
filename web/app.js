@@ -12,6 +12,10 @@ const $$ = (q) => [...document.querySelectorAll(q)];
 const customKey = "pqc-iot-sim.custom-devices.v1";
 const measuredKey = "pqc-iot-sim.measured-live.v1";
 const wokwiKey = "pqc-iot-sim.wokwi-illustrative.v1";
+const realtimeBridgeUrl = "http://127.0.0.1:8787";
+let realtimeEvents = [];
+let realtimeSessionId = null;
+let realtimeEventSource = null;
 let customs = loadCustoms();
 loadMeasuredResults();
 loadWokwiResults();
@@ -446,6 +450,75 @@ function renderHardwareSim() {
   $("#hw-results").innerHTML = `<b>Literature / projection:</b> ${format(literature.estimatedTimeMs, " ms", 1)}<br><b>Measured live:</b> ${live ? `${format(live.measurement.meanMs, " ms", 2)} (${esc(live.operation)})` : "none imported"}<br><b>Simulated-illustrative:</b> ${simulated.length ? simulated.map((item) => `${esc(item.operation)} ${format(item.elapsedMs, " ms", 3)}`).join(" · ") : "none captured"}`;
   const last = simulated.at(-1);
   $("#hw-phase").textContent = last ? `Last parsed phase: ${last.operation} · ${last.elapsedMs} ms · ${last.implementation} workload · ${last.capturedAt}` : "No phase output captured for this selection.";
+  $("#hw-run").disabled = !mapping?.project || Boolean(realtimeSessionId);
+  $("#hw-stop").disabled = !realtimeSessionId;
+}
+
+function appendRealtimeLine(line) {
+  realtimeEvents.push(line);
+  if (realtimeEvents.length > 100) realtimeEvents.shift();
+  $("#hw-event-log").textContent = realtimeEvents.join("\n");
+  $("#hw-event-log").scrollTop = $("#hw-event-log").scrollHeight;
+}
+async function checkRealtimeBridge() {
+  try {
+    const response = await fetch(`${realtimeBridgeUrl}/api/health`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    $("#hw-bridge-status").textContent = "Local Wokwi bridge is available at 127.0.0.1:8787.";
+  } catch {
+    $("#hw-bridge-status").textContent = "Local bridge is offline. Run npm run realtime, then refresh or start a run.";
+  }
+}
+function stopRealtimeStream() {
+  realtimeEventSource?.close(); realtimeEventSource = null; realtimeSessionId = null;
+  $("#hw-stop").disabled = true; $("#hw-run").disabled = !wokwiBoards[$("#hw-device").value]?.project;
+}
+function handleRealtimeEvent(item) {
+  if (item.type === "status") {
+    $("#hw-session-label").textContent = `Session ${realtimeSessionId} · ${item.status}${item.error ? ` · ${item.error}` : ""}`;
+    appendRealtimeLine(`[${item.at}] session ${item.status}${item.error ? `: ${item.error}` : ""}`);
+    if (["completed", "failed"].includes(item.status)) stopRealtimeStream();
+    return;
+  }
+  if (item.type === "log") { appendRealtimeLine(`[${item.at}] ${item.stream}: ${item.line}`); return; }
+  if (item.type === "rejected_event") { appendRealtimeLine(`[${item.at}] rejected: ${item.reason}`); return; }
+  if (item.type !== "telemetry") return;
+  const event = item.event;
+  appendRealtimeLine(`[${item.at}] ${event.event}${event.operation ? ` · ${event.operation}` : ""}${Number.isFinite(event.elapsedUs) ? ` · ${(event.elapsedUs / 1000).toFixed(3)} ms` : ""}`);
+  if (event.event === "operation_result") {
+    importWokwiResult({ data_source: "simulated-illustrative", deviceId: event.deviceId, algorithmId: event.algorithmId, operation: event.operation, elapsedMs: event.elapsedUs / 1000, capturedAt: event.receivedAt, implementation: "stub" });
+    saveWokwiResults(); renderHardwareSim(); renderStatesDashboard();
+  }
+}
+async function startRealtimeWokwi() {
+  const projectId = wokwiBoards[$("#hw-device").value]?.project;
+  if (!projectId) return toast("This device has no allow-listed Wokwi project.");
+  $("#hw-run").disabled = true; $("#hw-bridge-status").textContent = "Starting local Wokwi CLI…";
+  try {
+    const response = await fetch(`${realtimeBridgeUrl}/api/wokwi/sessions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ projectId }) });
+    const session = await response.json();
+    if (!response.ok) throw new Error(session.error || `Bridge returned HTTP ${response.status}`);
+    realtimeSessionId = session.id; realtimeEvents = [];
+    $("#hw-session-label").textContent = `Session ${session.id} · ${session.status}`;
+    $("#hw-log-download").href = `${realtimeBridgeUrl}/api/wokwi/sessions/${session.id}/log`;
+    $("#hw-log-download").hidden = false;
+    appendRealtimeLine(`Connected to allow-listed ${projectId} project. Firmware is a dummy workload.`);
+    realtimeEventSource?.close();
+    realtimeEventSource = new EventSource(`${realtimeBridgeUrl}/api/wokwi/sessions/${session.id}/events`);
+    realtimeEventSource.addEventListener("update", (message) => { try { handleRealtimeEvent(JSON.parse(message.data)); } catch { appendRealtimeLine("Ignored malformed bridge event."); } });
+    realtimeEventSource.onerror = () => { if (realtimeSessionId) $("#hw-bridge-status").textContent = "Live stream disconnected; the local run may still be active."; };
+    $("#hw-bridge-status").textContent = "Live Wokwi session connected. Output is illustrative only.";
+    renderHardwareSim();
+  } catch (error) {
+    $("#hw-bridge-status").textContent = error.message;
+    $("#hw-run").disabled = false;
+  }
+}
+async function stopRealtimeWokwi() {
+  if (!realtimeSessionId) return;
+  const sessionId = realtimeSessionId;
+  try { await fetch(`${realtimeBridgeUrl}/api/wokwi/sessions/${sessionId}/stop`, { method: "POST" }); }
+  catch { $("#hw-bridge-status").textContent = "Could not reach the local bridge to stop this run."; }
 }
 
 $(".nav").addEventListener("click", (event) => { const button = event.target.closest("[data-view]"); if (button) setView(button.dataset.view); });
@@ -475,6 +548,8 @@ $("#measured-import").addEventListener("change", async (event) => {
 });
 $("#hw-device").addEventListener("change", renderHardwareSim);
 $("#hw-algo").addEventListener("change", renderHardwareSim);
+$("#hw-run").addEventListener("click", startRealtimeWokwi);
+$("#hw-stop").addEventListener("click", stopRealtimeWokwi);
 $("#hw-import").addEventListener("click", () => {
   try {
     const deviceId = $("#hw-device").value;
@@ -529,4 +604,4 @@ $("#hw-device").innerHTML = allDevices().map((device) => `<option value="${esc(d
 $("#hw-device").value = "rp2040";
 $("#hw-algo").innerHTML = algorithms.map((algo) => `<option value="${esc(algo.id)}">${esc(algo.name)}</option>`).join("");
 $("#hw-algo").value = "ml-kem-512";
-renderOverview(); renderDeviceTable(); renderReferences(); generateDeviceCatalog(customs); renderMatrix(); renderStatesDashboard(); populateSelectors(); renderHardwareSim();
+renderOverview(); renderDeviceTable(); renderReferences(); generateDeviceCatalog(customs); renderMatrix(); renderStatesDashboard(); populateSelectors(); renderHardwareSim(); checkRealtimeBridge();

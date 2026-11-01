@@ -1,20 +1,8 @@
-# PQC-on-IoT Simulator — In-Browser Hardware Simulation with Wokwi
+# PQC-on-IoT Simulator — Wokwi Integration
 
-Companion to `01-DESIGN.md` through `10-REAL-PQC-PIPELINE.md`. `10-REAL-PQC-PIPELINE.md`
-covers measuring real PQC on a physical board on your bench. This file covers the middle
-ground: using **Wokwi** (wokwi.com), a browser-based electronics/microcontroller simulator, so
-anyone can watch a device-shaped simulation actually run code, wire up components, and print
-real serial output — without owning the hardware — and see that embedded directly in this
-project's web app.
+This document describes the local Wokwi CLI bridge and illustrative firmware protocol. It complements `10-REAL-PQC-PIPELINE.md`; virtual results remain distinct from physical `measured-live` data.
 
-**Scope boundary, stated up front (same discipline as every other file in this set):** Wokwi
-simulates instruction execution and peripherals, not cycle-accurate silicon timing. It is a
-genuinely useful **illustrative and educational** layer — real code actually runs, real serial
-output actually prints — but its timing is not a substitute for either the literature anchors
-in `01-DESIGN.md` or the physical-hardware `measured-live` data in
-`10-REAL-PQC-PIPELINE.md`. Every number Wokwi produces in this project is labeled
-`simulated-illustrative`, a fourth, clearly distinct tier alongside `literature-anchor`,
-`extrapolated`, and `measured-live`.
+Wokwi simulates firmware and peripherals but does not provide cycle-accurate physical timing. The two committed sketches still run dummy arithmetic loops. They do not link a PQC library, execute cryptographic operations, or produce physical performance measurements. Their telemetry is labeled `simulated-illustrative` with timer source `wokwi-virtual`.
 
 ## 1. Why add this
 
@@ -40,21 +28,11 @@ Wokwi supports a specific set of boards/chips. Not every device in
 A board with no Wokwi equivalent still works everywhere else in the project (Simulator,
 Dashboard, exports) — the Wokwi tab is additive, never a requirement.
 
-## 3. What actually runs inside the simulation
+## 3. Firmware and telemetry
 
-- A small sketch (Arduino-style `.ino` or PlatformIO `main.cpp`, depending on the board) that:
-  1. Links a lightweight PQC implementation suitable for the simulated chip — reuse the same
-     library choice as `10-REAL-PQC-PIPELINE.md` §3 (liboqs/pqm4) where a build target exists
-     for the simulated architecture; for boards where that's not practical inside Wokwi's
-     toolchain, use a clearly-labeled **stub** that times a representative dummy computation
-     (e.g. a fixed number of modular-multiplication-shaped operations) rather than a real
-     ML-KEM/ML-DSA call, so the "is this real?" question always has an honest answer per board.
-  2. Toggles a wired LED per operation phase (key generation / encapsulation / signing, etc.),
-     giving a physical-looking visual cue, not just a serial log line.
-  3. Prints `operation,elapsed_ms` lines to the simulated serial port as each phase completes.
-- A `diagram.json` circuit: the board plus one LED per tracked phase (and a resistor each),
-  wired to GPIO pins — simple, legible, not a dense breadboard.
-- A `wokwi.toml` project config pointing at the sketch and diagram, per Wokwi's project format.
+The RP2040 and ATtiny85 sketches toggle phase LEDs around dummy workloads and emit one JSON object per serial line. Protocol v1 events carry a monotonically increasing sequence number, board identity, algorithm label, operation, elapsed microseconds, and `timerSource: "wokwi-virtual"`. The `implementation` field is `stub`.
+
+These operation labels identify the demonstration workload only. No KAT or host-reference result is emitted, because no PQC implementation is linked. The bridge therefore imports results only as `simulated-illustrative`; it cannot promote them to `wokwi-executed` or `measured-live`.
 
 ## 4. File layout addition
 
@@ -71,40 +49,13 @@ wokwi-projects/
 └── README.md              # project notes
 ```
 
-## 5. Embedding in the web app
+## 5. Local bridge and Hardware Sim
 
-- New tab: **Hardware Sim**, alongside Playground, using Wokwi's embeddable simulator (an
-  `<iframe>` pointed at a Wokwi project, using Wokwi's public embedding support) — no backend
-  needed, consistent with the project's no-server design (`02-IMPLEMENTATION.md` §2).
-- Device dropdown mirrors the Devices tab, but only offers devices with a Wokwi mapping (§2);
-  unsupported devices show the "not available in Wokwi" message rather than being hidden
-  entirely, so the catalog stays visibly complete.
-- Algorithm dropdown mirrors the Simulator tab, filtered to whichever operations the selected
-  board's project actually implements.
-- **Live data bridge**: Wokwi's serial output is captured via its embed messaging interface and
-  parsed for the `operation,elapsed_ms` lines described in §3; as each line arrives, the
-  corresponding LED's state and a small on-page readout update together — so the browser-side
-  UI and the simulated board's own LED stay visually synchronized, not just two separate
-  displays of the same data.
-- A **side-by-side comparison panel** shows, for the current selection: literature anchor time,
-  extrapolated/measured-live time if available (from earlier files), and the
-  `simulated-illustrative` time just observed — three numbers, three clearly different labels,
-  never merged into one.
+The static browser cannot launch a local process. Run `npm run realtime` in a second terminal beside `npm run start`. The bridge binds to `127.0.0.1:8787` and allows only the built-in `rp2040` and `attiny-avr` project IDs. It invokes `wokwi-cli` with a fixed project path and `shell: false`; browser requests cannot provide executable names or filesystem paths.
 
-## 6. Configuring the device inside Wokwi
+The bridge exposes health, start-session, session status, SSE events, stop, and raw-log endpoints. Sessions are limited to three active runs, Wokwi simulation timeout is bounded, and the raw log is capped at 1 MB. The browser Hardware Sim view starts and stops sessions, displays JSONL events, stores operation results in the existing separate illustrative store, and offers raw-log download. Manual legacy serial import remains available.
 
-- "Open in Wokwi" button opens the full Wokwi editor (new tab) with the exact same project,
-  so a user can edit wiring, swap components, or modify the sketch directly in Wokwi's own
-  full-featured environment — this project doesn't reimplement a wiring editor; it embeds and
-  defers to Wokwi's for anything beyond the basic view.
-- Changes made in the full Wokwi editor are **not** synced back into this project's own
-  `wokwi-projects/` automatically (that would require a Wokwi account/API write-back scope
-  beyond this plan's purpose) — the embedded view always reflects this project's committed
-  version; "Open in Wokwi" is explicitly a fork-off point for exploration, not a shared live
-  edit session.
-- A "Reset to default wiring" control reloads the embedded project from the committed
-  `diagram.json`, undoing any in-session tinkering in the embedded (not the full-editor)
-  view.
+`WOKWI_CLI_TOKEN` may be required by Wokwi CLI. Keep it in the local process environment; it is never sent to browser code or committed to the repository. Wokwi CLI and PlatformIO must be installed and the selected firmware built before a run can start.
 
 ## 7. Data handling and labeling
 
@@ -120,37 +71,20 @@ wokwi-projects/
 
 ## 8. Tests
 
-| Test | Expectation |
-|---|---|
-| Embedded Wokwi iframe loads for `rp2040` | simulation boots, serial output begins printing within a reasonable timeout |
-| Selecting a device with no Wokwi mapping (`cw308-stm32f3`) | Hardware Sim tab shows the "not available" message, no broken iframe |
-| LED state in the embedded view | matches the most recently parsed serial `operation` line — i.e., if serial says `encapsulate` just completed, the encapsulate LED is the one lit, not a stale one |
-| Captured `simulated-illustrative` reading | never overwrites or is displayed merged with an `unavailable`, `literature-anchor`, `extrapolated`, or `measured-live` value for the same cell — always a clearly separate, labeled entry |
-| "Reset to default wiring" | reloads the embedded view to the committed `diagram.json`, discarding any in-session edits in that embedded view only |
-| Report tab | contains the §7 disclosure paragraph verbatim-equivalent, so the limitation is never silently dropped from user-facing text |
+Automated tests validate JSONL event parsing, device and algorithm identity, increasing sequence numbers, timing values, fixed project allow-listing, bounded timeout inputs, and structured session forwarding. Browser tests confirm that the Hardware Sim surface includes the live stream controls. Actual Wokwi execution still requires the external CLI and a built firmware image.
 
 ## 9. Milestones
 
-Extends `10-REAL-PQC-PIPELINE.md` §8:
-
-| Milestone | Scope | Exit criteria |
-|---|---|---|
-| M13 — Wokwi project set | `wokwi-projects/rp2040` (and `attiny-avr`, since both have strong native Wokwi support) with diagram, sketch, phase LEDs, serial output | Both projects boot and print `operation,elapsed_ms` lines correctly when run directly in Wokwi's own editor |
-| M14 — Web embed | Hardware Sim tab, iframe embed, serial parsing bridge, side-by-side comparison panel | §8 tests pass; unsupported devices degrade gracefully instead of erroring |
-| M15 — Catalog mapping completion | Extend the §2 mapping table to cover as much of `06-DEVICE-CATALOG.md`'s device list as Wokwi genuinely supports | Mapping table in §2 reflects Wokwi's current board list, rechecked, no device falsely marked supported |
+| Milestone | Status |
+|---|---|
+| M13 — local Wokwi projects | Included, with dummy firmware and structured telemetry; builds need PlatformIO validation |
+| M14 — live local bridge | Implemented: allow-listed runner, session APIs, SSE, logs, browser controls |
+| M15 — mapping completion | Existing mapping retained; only RP2040 and ATtiny85 have bundled projects |
+| M16 — actual PQC in Wokwi | Not implemented; requires selecting and pinning a vetted library and passing KATs |
+| M17 — physical hardware | Not implemented; requires attached board, toolchain, and verified harness |
 
 ## 10. Current repository integration
 
-The repository includes local PlatformIO/Wokwi projects for RP2040 and ATtiny85, a Hardware Sim
-view, and a parser that stores captured rows separately as `simulated-illustrative`. The bundled
-firmware uses dummy arithmetic loops; no PQC library is linked and these readings are not
-cryptographic measurements. The view links to Wokwi's blank board editor, where the included
-sketch and diagram can be copied, and accepts serial output pasted from that session.
+`tools/wokwi-bridge/` contains the JSONL parser, session manager, and loopback HTTP/SSE server. Start it with `npm run realtime`. The static app remains a separate process. `benchmark-data/wokwi.js` is the project allow-list source context; the bridge independently hard-codes the two safe project paths.
 
-The iframe bridge in §5 is deferred. Wokwi's published embed example currently describes itself
-as an unsupported prototype, and its `experimental/embed` endpoint needs a client ID and uploaded
-project files. This checkout has neither published Wokwi project IDs nor an approved embed client
-ID, so it does not claim a working embedded simulator or automatic serial capture. The local
-projects can be run through Wokwi for VS Code / CLI. Current board mapping lives in
-`benchmark-data/wokwi.js`; it lists documented Pico, ATtiny85, and NUCLEO-L031K6 board support,
-with only the first two having included sketches.
+No local Wokwi or PlatformIO binary is available in the development environment, so firmware builds, diagram lint, and a live CLI run could not be verified here. No PQC library has been downloaded or linked. Network packet modeling, physical-board serial transport, memory instrumentation, and physical energy measurement remain separate roadmap work and are not claimed by this integration.

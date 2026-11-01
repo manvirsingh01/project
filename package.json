@@ -6,14 +6,16 @@
   "description": "A literature-based PQC-on-IoT benchmark projection simulator",
   "bin": { "pqc-iot-sim": "./cli/pqc-iot-sim.js" },
   "scripts": {
-    "start": "python3 -m http.server 8001 --directory .",
+    "start": "node tools/serve.js",
+    "realtime": "node tools/wokwi-bridge/server.js",
     "cli": "node cli/pqc-iot-sim.js",
-    "check": "node --check core/index.js && node --check core/measuredResults.js && node --check core/wokwi.js && node --check core/mwcRules.js && node --check core/variance.js && node --check core/alerts.js && node --check core/deviceCatalog.js && node --check core/dataExport.js && node --check benchmark-data/index.js && node --check benchmark-data/wokwi.js && node --check benchmark-data/references.js && node --check cli/pqc-iot-sim.js && node --check web/app.js",
+    "check": "node --check core/index.js && node --check core/measuredResults.js && node --check core/wokwi.js && node --check core/mwcRules.js && node --check core/variance.js && node --check core/alerts.js && node --check core/deviceCatalog.js && node --check core/dataExport.js && node --check benchmark-data/index.js && node --check benchmark-data/wokwi.js && node --check benchmark-data/references.js && node --check cli/pqc-iot-sim.js && node --check tools/serve.js && node --check tools/wokwi-bridge/parser.js && node --check tools/wokwi-bridge/sessionManager.js && node --check tools/wokwi-bridge/server.js && node --check web/app.js",
     "test": "node --test tests/*.test.js",
     "test:data": "node --test tests/data.test.js",
     "test:core": "node --test tests/core.test.js",
     "test:cli": "node --test tests/cli.test.js",
-    "test:wokwi": "node --test tests/wokwi.test.js",
+    "test:wokwi": "node --test tests/wokwi.test.js tests/realtime.test.js",
+    "test:realtime": "node --test tests/realtime.test.js",
     "test:web": "node --test tests/web.test.js tests/browser.test.js"
   }
 }

@@ -6,7 +6,7 @@
 
 ## Development Commands
 
-- `npm run start` serves the static app at `http://localhost:8001/` using Python 3; the root page redirects to `web/`.
+- `npm run start` serves the static app on loopback, preferring port 8001 and selecting the next free port if occupied; the root page redirects to `web/`.
 - `node cli/pqc-iot-sim.js help` lists CLI commands.
 - `npm run cli -- simulate --device rp2040 --algo ml-kem-512` runs a projection.
 - `node cli/pqc-iot-sim.js states --algo ml-kem --device-type catalog` prints a filtered matrix; add `--json` or `--export pdf --out states.pdf` for exports.

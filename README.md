@@ -6,13 +6,15 @@ An optional Hardware Sim view links local Wokwi RP2040 and ATtiny85 stub project
 
 ## Run locally
 
-Requires Node.js 18+ and Python 3 (for the static web server). There are no npm dependencies.
+Requires Node.js 18+. There are no npm runtime dependencies.
 
 ```sh
 npm run start
 ```
 
-Open [http://localhost:8001/](http://localhost:8001/); the project root redirects to the app. If starting the server manually, run it from the repository root. The browser UI saves custom profiles in local storage.
+Open the URL printed by the server; it prefers `http://127.0.0.1:8001/` and the project root redirects to the app. The browser UI saves custom profiles in local storage.
+
+For live Wokwi serial events, run `npm run realtime` in a second terminal. The web server prefers port 8001 and automatically tries the next 20 ports if it is occupied; it prints the selected URL. The local bridge binds only to `127.0.0.1:8787`, starts only the allow-listed RP2040 and ATtiny85 projects, and requires Wokwi CLI plus built firmware. Current sketches are stubs; their JSONL timings are illustrative and are not PQC or physical-board results.
 
 Run the CLI directly:
 

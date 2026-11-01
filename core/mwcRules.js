@@ -9,6 +9,15 @@ export const MWC_THRESHOLDS = Object.freeze({
 });
 
 export function classifyDevice(device, requiredAlgos = []) {
+  if (requiredAlgos.length && requiredAlgos.every((algo) => (typeof algo === "object" ? algo?.level : 0) === 0)) {
+    return { verdict: "not-applicable", reasons: ["Classical baseline; MWC floors are defined for PQC workloads."] };
+  }
+  if (requiredAlgos.some((algo) => typeof algo === "object" && algo?.id === "lms-h25")) {
+    return { verdict: "unknown", reasons: ["LMS verification RAM requirement has no supplied anchor."] };
+  }
+  if (requiredAlgos.some((algo) => typeof algo === "object" && algo?.id === "slh-dsa-128s")) {
+    return { verdict: "unknown", reasons: ["No SLH-DSA RAM or implementation anchor is supplied."] };
+  }
   const cpu = device?.cpu === "custom" ? (device.baseCpu || "cortex-m0+") : device?.cpu;
   if (!device || !["cortex-m0", "cortex-m0+", "cortex-m4", "cortex-m7"].includes(cpu)) {
     return { verdict: "infeasible", reasons: [`Architecture class excluded${device?.cpu ? ` — ${device.cpu}` : ""}. Requires a 32-bit Cortex-M0 or better.`] };

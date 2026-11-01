@@ -13,10 +13,10 @@ test("reference device set and hardware anchors match the supplied design", () =
   assert.deepEqual([board.rp2040.ramKB, board.rp2040.flashKB, board.rp2040.clockMHz], [264, 2048, 133]);
   assert.deepEqual([board["cw308-stm32f3"].ramKB, board["cw308-stm32f3"].flashKB], [40, 256]);
   assert.deepEqual([board["nucleo-l476rg"].ramKB, board["nucleo-l476rg"].flashKB], [128, 1024]);
-  assert.equal(board["nucleo-l476rg"].clockMHz, null);
+  assert.equal(board["nucleo-l476rg"].clockMHz, 80);
   assert.deepEqual([board["stm32f4-disco"].ramKB, board["stm32f4-disco"].flashKB, board["stm32f4-disco"].clockMHz], [192, 1024, 168]);
   assert.deepEqual([board["nucleo-l4r5zi"].ramKB, board["nucleo-l4r5zi"].flashKB], [640, 2048]);
-  assert.equal(board["nucleo-l4r5zi"].clockMHz, null);
+  assert.equal(board["nucleo-l4r5zi"].clockMHz, 120);
   assert.equal(board["stm32l031"].ramKB, 8);
   assert.equal(board["attiny-avr"].cpu, "avr-8bit");
   assert.equal(board["msp430fr"].cpu, "msp430-16bit");
@@ -39,6 +39,6 @@ test("every algorithm has provenance and all published anchor values stay intact
 });
 
 test("MWC threshold data matches the stated floors", () => {
-  assert.equal(DATA_VERSION, "1.2.0");
+  assert.equal(DATA_VERSION, "1.3.0");
   assert.deepEqual(MWC_THRESHOLDS, { minimumClockMHz: 48, kemRamKB: 64, fullAgilityRamKB: 128, minimumFlashKB: 512, recommendedFlashKB: 1024, infeasibleRamRatio: 0.8, stackHeadroomRatio: 1.2 });
 });

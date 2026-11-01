@@ -40,7 +40,7 @@ function allDevices() { return [...devices, ...customs]; }
 function toast(message) { const node = $("#toast"); node.textContent = message; node.classList.add("show"); clearTimeout(toast.timer); toast.timer = setTimeout(() => node.classList.remove("show"), 2700); }
 function selectOptions(items, selected, label) { return `<option value="" disabled>${label}</option>` + items.map((item) => `<option value="${esc(item.id)}" ${item.id === selected ? "selected" : ""}>${esc(item.name)}</option>`).join(""); }
 function format(value, suffix = "", digits = 1) { return Number.isFinite(value) ? `${Number(value.toFixed(digits)).toLocaleString()}${suffix}` : "Not available"; }
-function tierFormat(result, value, suffix = "", digits = 1, subTier = null) { return Number.isFinite(value) ? `${(subTier || result.confidenceTier) === "measured" ? "" : "~"}${format(value, suffix, digits)}` : "Not available"; }
+function tierFormat(result, value, suffix = "", digits = 1, subTier = null) { return Number.isFinite(value) ? `${(subTier || result.confidenceTier) === "literature-exact" ? "" : "~"}${format(value, suffix, digits)}` : "Not available"; }
 function status(verdict) { return `<span class="status ${verdict}">${esc(verdict)}</span>`; }
 
 function populateSelectors() {
@@ -106,7 +106,7 @@ function statesSelectedDevices() {
   });
 }
 function stateCellMarkup(result) {
-  const time = Number.isFinite(result.estimatedTimeMs) ? `${result.confidenceTier === "measured" ? "" : "~"}${format(result.estimatedTimeMs, " ms", 1)}` : "time unavailable";
+  const time = Number.isFinite(result.estimatedTimeMs) ? `${result.confidenceTier === "literature-exact" ? "" : "~"}${format(result.estimatedTimeMs, " ms", 1)}` : "time unavailable";
   const live = getMeasuredResult(result.device.id, result.algorithm.id);
   const simulated = getWokwiResult(result.device.id, result.algorithm.id);
   return `<button class="state-cell ${result.mwcVerdict}" data-state-device="${esc(result.device.id)}" data-state-algo="${esc(result.algorithm.id)}" title="${esc(result.mwcReasons.join(" "))}">${esc(result.mwcVerdict)}${live ? `<small>LIVE · ${format(live.measurement.meanMs, " ms", 1)}</small>` : simulated ? `<small>SIM · ${format(simulated.elapsedMs, " ms", 3)}</small>` : `<small>${esc(time)}</small>`}</button>`;
@@ -163,8 +163,8 @@ function renderStateDetail(deviceId, algoId) {
 function renderStatesDashboard() {
   const algoList = statesSelectedAlgorithms(), selected = statesSelectedDevices();
   const matrix = getFullMatrix(selected, algoList);
-  const counts = { reliable: 0, marginal: 0, infeasible: 0 };
-  for (const { cells } of matrix) for (const cell of cells) counts[cell.mwcVerdict]++;
+  const counts = { reliable: 0, marginal: 0, infeasible: 0, unknown: 0, "not-applicable": 0 };
+  for (const { cells } of matrix) for (const cell of cells) counts[cell.mwcVerdict] = (counts[cell.mwcVerdict] || 0) + 1;
   $("#states-summary").innerHTML = Object.entries(counts).map(([state, count]) => `<div class="states-count ${state}"><b>${count}</b>${state[0].toUpperCase()}${state.slice(1)} cells</div>`).join("");
   renderStateMatrix(matrix, algoList);
   const classical = $("#states-classical").checked, logarithmic = $("#states-log").checked;

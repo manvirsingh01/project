@@ -7,7 +7,7 @@ const find = (rows, deviceId, algoId, operation) => rows.find((row) => row.devic
 
 test("operation export generates the documented flat rows for all devices and supported algorithm families", () => {
   const rows = getOperationLevelData(devices);
-  assert.equal(rows.length, devices.length * 23);
+  assert.equal(rows.length, devices.length * 27);
   assert.deepEqual(Object.keys(rows[0]), DATA_EXPORT_COLUMNS);
   assert.equal(find(rows, "rp2040", "ml-kem-512", "full_handshake").time_ms, 35.7);
   assert.equal(find(rows, "rp2040", "ml-kem-768", "full_handshake").time_ms, 56.6);
@@ -15,6 +15,10 @@ test("operation export generates the documented flat rows for all devices and su
   assert.equal(find(rows, "rp2040", "ml-dsa-44", "sign").time_ms, 158.9);
   assert.equal(find(rows, "rp2040", "ml-dsa-65", "sign").time_ms, 256.6);
   assert.equal(find(rows, "rp2040", "ml-dsa-87", "sign").time_ms, 355.2);
+  assert.equal(find(rows, "rp2040", "slh-dsa-128s", "sign").data_source, "unavailable");
+  assert.equal(find(rows, "rp2040", "lms-h25", "verify").mwc_verdict, "unknown");
+  assert.equal(find(rows, "rp2040", "ml-kem-768", "full_handshake").handshake_bytes, 2272);
+  assert.equal(find(rows, "rp2040", "ml-kem-512", "full_handshake").value_kind, "anchor");
 });
 
 test("unpublished phases stay null with explicit reasons; signing variance is phase-scoped", () => {
@@ -32,6 +36,9 @@ test("unpublished phases stay null with explicit reasons; signing variance is ph
   assert.deepEqual([sign65.cv_percent, sign65.p99_ms], [null, null]);
   assert.deepEqual([sign87.cv_percent, sign87.p99_ms], [null, 1125]);
   assert.equal(find(rows, "attiny-avr", "ml-kem-512", "full_handshake").time_ms, null);
+  assert.equal(find(rows, "attiny-avr", "ml-dsa-44", "sign").cv_percent, null);
+  assert.equal(find(rows, "rp2040", "ecdh-p256", "full_handshake").mwc_verdict, "not-applicable");
+  assert.equal(find(rows, "rp2040", "ml-kem-512", "keygen").data_source, "unavailable");
 });
 
 test("CSV preserves null explicitly and numbers-only PDF is plain paginated text", () => {
@@ -41,7 +48,8 @@ test("CSV preserves null explicitly and numbers-only PDF is plain paginated text
   assert.match(csv, /"null"/);
   const pdf = Buffer.from(createNumbersOnlyPdf(rows, { dataVersion: "test-data", engineVersion: "test-engine" })).toString("latin1");
   assert.ok(pdf.startsWith("%PDF-1.4"));
-  assert.match(pdf, /Devices 10 \| Algorithms 8 \| Data test-data \| Engine test-engine/);
+  assert.match(pdf, /Devices 10 \| Algorithms 10 \| Data test-data \| Engine test-engine/);
+  assert.match(pdf, /\\2474\.2/);
   assert.equal((pdf.match(/\/Type \/Page \/Parent/g) || []).length, 4);
   assert.doesNotMatch(pdf, /\/XObject|\/Image|\bDo\b|\bre f\b/);
   assert.ok(algorithms.some((algo) => algo.id === "ml-kem-1024"));

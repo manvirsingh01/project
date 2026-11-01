@@ -104,7 +104,7 @@ Opens when a matrix cell, or a chart bar, is clicked. Shows, for that one device
 pair, the full record generated at add-time (per `06-DEVICE-CATALOG.md` §3):
 
 - Identity (device spec) + algorithm identity (family, security level, payload size)
-- Confidence tier (measured/interpolated/extrapolated/unsupported) with its one-line
+- Confidence tier (literature-exact/interpolated/extrapolated/unsupported) with its one-line
   derivation note
 - Time (mean, and p95/p99 if a signature), stack RAM, flash, energy
 - MWC state + binding constraint sentence (e.g. *"RAM 8 KB < 64 KB KEM-only floor"*)

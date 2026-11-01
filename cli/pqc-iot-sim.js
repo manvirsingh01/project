@@ -39,7 +39,7 @@ function quote(value) { return `"${String(value ?? "").replaceAll('"', '""')}"`;
 
 const columns = [
   { name: "Device", value: (r) => r.device.name }, { name: "Algorithm", value: (r) => r.algorithm.name },
-  { name: "Mean ms", value: (r) => `${r.confidenceTier === "measured" ? "" : "~"}${r.estimatedTimeMs?.toFixed(1) ?? "Not available"}` },
+  { name: "Mean ms", value: (r) => `${r.confidenceTier === "literature-exact" ? "" : "~"}${r.estimatedTimeMs?.toFixed(1) ?? "Not available"}` },
   { name: "Live ms", value: (r) => r.measuredLive ? `${r.measuredLive.measurement.meanMs.toFixed(2)} (${r.measuredLive.operation})` : "Not available" },
   { name: "p95 ms", value: (r) => r.estimatedP95Ms?.toFixed(1) ?? "Not available" },
   { name: "p99 ms", value: (r) => r.estimatedP99Ms?.toFixed(1) ?? "Not available" },

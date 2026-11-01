@@ -7,7 +7,10 @@ export const DATA_EXPORT_COLUMNS = [
   "device_id", "device_cpu", "device_ram_kb", "device_flash_kb", "device_clock_mhz",
   "algo_id", "algo_family", "security_level", "operation", "time_ms", "stack_kb",
   "energy_mj", "payload_bytes", "cv_percent", "p99_ms", "mwc_verdict",
-  "confidence_tier", "data_source", "device_firmware_hash", "source_citation", "note"
+  "confidence_tier", "data_source", "device_firmware_hash", "source_citation", "note",
+  "value_kind", "anchor_id", "assumptions", "clock_assumed", "flash_footprint_kb",
+  "p50_ms", "p95_ms", "expected_iterations", "pk_bytes", "sk_bytes", "ct_or_sig_bytes",
+  "handshake_bytes", "mwc_applicable", "mwc_scope"
 ];
 
 function operationPlan(algo) {
@@ -15,6 +18,8 @@ function operationPlan(algo) {
   if (algo.id.startsWith("ml-dsa-")) return ["keygen", "sign", "verify"];
   if (algo.id === "ecdh-p256") return ["full_handshake"];
   if (algo.id === "ecdsa-p256") return ["sign"];
+  if (algo.id === "slh-dsa-128s") return ["keygen", "sign", "verify"];
+  if (algo.id === "lms-h25") return ["verify"];
   return [];
 }
 
@@ -55,14 +60,28 @@ export function getOperationLevelData(deviceList = devices, algoList = algorithm
           stack_kb: available ? result.estimatedStackKB : null,
           energy_mj: available ? result.estimatedEnergyMJ : null,
           payload_bytes: payloadApplies ? algo.payloadBytes ?? null : null,
-          cv_percent: operation === "sign" ? algo.cvPercent ?? null : null,
-          p99_ms: operation === "sign" ? result.estimatedP99Ms ?? null : null,
+          cv_percent: available && operation === "sign" ? algo.cvPercent ?? null : null,
+          p99_ms: available && operation === "sign" ? result.estimatedP99Ms ?? null : null,
           mwc_verdict: result.mwcVerdict,
           confidence_tier: available ? result.confidenceTier : "unsupported",
-          data_source: result.isExtrapolated ? "extrapolated" : "literature-anchor",
+          data_source: !available ? "unavailable" : result.isExtrapolated ? "extrapolated" : "literature-anchor",
           device_firmware_hash: null,
           source_citation: algo.source,
-          note
+          note,
+          value_kind: available ? result.confidenceTier === "literature-exact" ? "anchor" : "derived" : "unavailable",
+          anchor_id: available ? `design:${algo.id}:m0plus-133` : null,
+          assumptions: available ? result.assumptions.join("|") : null,
+          clock_assumed: device.clockIsNominal ?? false,
+          flash_footprint_kb: result.estimatedFlashKB,
+          p50_ms: available ? result.estimatedP50Ms : null,
+          p95_ms: available ? result.estimatedP95Ms : null,
+          expected_iterations: algo.expectedRejectionIterations ?? null,
+          pk_bytes: algo.pkBytes ?? null,
+          sk_bytes: algo.skBytes ?? null,
+          ct_or_sig_bytes: algo.ctOrSigBytes ?? null,
+          handshake_bytes: algo.family === "kem" && algo.level > 0 ? (algo.pkBytes ?? 0) + (algo.ctOrSigBytes ?? 0) : null,
+          mwc_applicable: algo.level > 0,
+          mwc_scope: available ? "operation" : "algorithm"
         });
       }
     }
@@ -81,7 +100,13 @@ export function getOperationLevelData(deviceList = devices, algoList = algorithm
       cv_percent: live.measurement.cvPercent ?? null, p99_ms: live.measurement.p99Ms ?? null,
       mwc_verdict: null, confidence_tier: "measured-live", data_source: "measured-live",
       device_firmware_hash: device.firmwareBuildHash, source_citation: "On-device PQC harness",
-      note: `${live.measurement.runCount} runs; KAT and host reference checks passed; captured ${live.timestamp}.`
+      note: `${live.measurement.runCount} runs; KAT and host reference checks passed; captured ${live.timestamp}.`,
+      value_kind: "measured-live", anchor_id: live.id, assumptions: null, clock_assumed: false,
+      flash_footprint_kb: algo.flashFootprintKB ?? null, p50_ms: live.measurement.p50Ms ?? null,
+      p95_ms: live.measurement.p95Ms ?? null, expected_iterations: algo.expectedRejectionIterations ?? null,
+      pk_bytes: algo.pkBytes ?? null, sk_bytes: algo.skBytes ?? null, ct_or_sig_bytes: algo.ctOrSigBytes ?? null,
+      handshake_bytes: algo.family === "kem" && algo.level > 0 ? (algo.pkBytes ?? 0) + (algo.ctOrSigBytes ?? 0) : null,
+      mwc_applicable: algo.level > 0, mwc_scope: "measurement"
     });
   }
   for (const simulated of listWokwiResults()) {
@@ -96,7 +121,12 @@ export function getOperationLevelData(deviceList = devices, algoList = algorithm
       p99_ms: null, mwc_verdict: null, confidence_tier: "simulated-illustrative",
       data_source: "simulated-illustrative", device_firmware_hash: null,
       source_citation: "Wokwi dummy workload",
-      note: `${simulated.implementation} workload; not cryptographic execution; captured ${simulated.capturedAt}.`
+      note: `${simulated.implementation} workload; not cryptographic execution; captured ${simulated.capturedAt}.`,
+      value_kind: "simulated-illustrative", anchor_id: simulated.id, assumptions: null, clock_assumed: false,
+      flash_footprint_kb: null, p50_ms: null, p95_ms: null, expected_iterations: null,
+      pk_bytes: algo.pkBytes ?? null, sk_bytes: algo.skBytes ?? null, ct_or_sig_bytes: algo.ctOrSigBytes ?? null,
+      handshake_bytes: algo.family === "kem" && algo.level > 0 ? (algo.pkBytes ?? 0) + (algo.ctOrSigBytes ?? 0) : null,
+      mwc_applicable: algo.level > 0, mwc_scope: "illustrative"
     });
   }
   return rows;
@@ -107,12 +137,13 @@ export function operationDataToCsv(rows) {
   return [DATA_EXPORT_COLUMNS.map(quote).join(","), ...rows.map((row) => DATA_EXPORT_COLUMNS.map((column) => quote(row[column])).join(","))].join("\n") + "\n";
 }
 
-const pdfText = (value) => String(value ?? "—").normalize("NFKD").replaceAll("—", "@@EMDASH@@").replaceAll("–", "-").replace(/[^\x20-\x7e@]/g, "-").replaceAll("\\", "\\\\").replaceAll("(", "\\(").replaceAll(")", "\\)").replaceAll("@@EMDASH@@", "\\227");
-const columnWidths = [82, 78, 40, 43, 45, 80, 52, 28, 75, 48, 42, 45, 48, 42, 44, 65, 74, 80, 85, 170, 250];
+const pdfText = (value) => String(value ?? "—").normalize("NFKD").replaceAll("—", "@@EMDASH@@").replaceAll("–", "-").replaceAll("§", "@@SECTION@@").replace(/[^\x20-\x7e@]/g, "-").replaceAll("\\", "\\\\").replaceAll("(", "\\(").replaceAll(")", "\\)").replaceAll("@@EMDASH@@", "\\227").replaceAll("@@SECTION@@", "\\247");
+const baseColumnWidths = [82, 78, 40, 43, 45, 80, 52, 28, 75, 48, 42, 45, 48, 42, 44, 65, 74, 80, 85, 260, 330];
+const columnWidths = DATA_EXPORT_COLUMNS.map((column, index) => baseColumnWidths[index] ?? (column.length > 20 ? 90 : 68));
 const headers = DATA_EXPORT_COLUMNS.map((column) => column.replaceAll("_", " "));
 
-export function createNumbersOnlyPdf(rows, { deviceCount = new Set(rows.map((row) => row.device_id)).size, algorithmCount = new Set(rows.map((row) => row.algo_id)).size, dataVersion = "1.2.0", engineVersion = "1.2.0", generatedAt = new Date() } = {}) {
-  const pageWidth = 1600, pageHeight = 850, rowHeight = 9, firstY = 775, rowsPerPage = 72;
+export function createNumbersOnlyPdf(rows, { deviceCount = new Set(rows.map((row) => row.device_id)).size, algorithmCount = new Set(rows.map((row) => row.algo_id)).size, dataVersion = "1.3.0", engineVersion = "1.2.0", generatedAt = new Date() } = {}) {
+  const pageWidth = columnWidths.reduce((sum, width) => sum + width, 56), pageHeight = 850, rowHeight = 9, firstY = 775, rowsPerPage = 72;
   const pageCount = Math.max(1, Math.ceil(rows.length / rowsPerPage));
   const pageStreams = [];
   for (let page = 0; page < pageCount; page++) {

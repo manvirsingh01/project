@@ -66,7 +66,7 @@ test("CLI exact-anchor simulation exposes shared SimulationResult fields as JSON
   assert.equal(output.estimatedStackKB, 9.4);
   assert.equal(output.estimatedEnergyMJ, 2.83);
   assert.equal(output.isExtrapolated, false);
-  assert.equal(output.confidenceTier, "measured");
+  assert.equal(output.confidenceTier, "literature-exact");
   assert.ok(Array.isArray(output.alerts));
 });
 
@@ -127,7 +127,7 @@ test("CSV output has a header and Markdown report includes all ten topic heading
   for (let section = 1; section <= 10; section++) assert.match(report.stdout, new RegExp(`## ${section}\\.`));
   const version = runCli(["--version"]);
   assert.equal(version.status, 0);
-  assert.match(version.stdout, /data 1\.2\.0.*engine 1\.2\.0/);
+  assert.match(version.stdout, /data 1\.3\.0.*engine 1\.2\.0/);
 });
 
 test("references command prints the repository reference guide", () => {
@@ -146,7 +146,7 @@ test("raw export writes matching operation-level CSV, JSON, and numbers-only PDF
   const json = runCli(["export", "--format", "json", "--out", jsonPath]);
   assert.equal(json.status, 0, json.stderr);
   const rows = JSON.parse(readFileSync(jsonPath, "utf8"));
-  assert.equal(rows.length, new Set(rows.map((row) => row.device_id)).size * 23);
+  assert.equal(rows.length, new Set(rows.map((row) => row.device_id)).size * 27);
   assert.equal(rows.find((row) => row.device_id === "rp2040" && row.algo_id === "ml-kem-512" && row.operation === "full_handshake").time_ms, 35.7);
   const csvLines = readFileSync(csvPath, "utf8").trimEnd().split("\n");
   assert.match(csvLines[0], /device_id.*operation.*time_ms.*source_citation.*note/);

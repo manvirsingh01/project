@@ -72,21 +72,21 @@ test("variance falls back to percentile interpolation when reported p99 disagree
   assert.ok(variance.p95Ms > variance.p50Ms && variance.p95Ms < variance.p99Ms);
 });
 
-test("confidence tiers distinguish measured, interpolated, extrapolated, and unsupported", () => {
-  assert.equal(simulate("rp2040", "ml-kem-512").confidenceTier, "measured");
+test("confidence tiers distinguish literature-exact, interpolated, extrapolated, and unsupported", () => {
+  assert.equal(simulate("rp2040", "ml-kem-512").confidenceTier, "literature-exact");
   const custom = makeCustomDevice({ name: "same family", ramKB: 96, flashKB: 512, clockMHz: 64 });
   assert.equal(simulate(custom, "ml-kem-512").confidenceTier, "interpolated");
   assert.equal(simulate("stm32f4-disco", "ml-kem-512").confidenceTier, "extrapolated");
   assert.equal(simulate("rp2040", "lms-h25").confidenceTier, "unsupported");
 });
 
-test("anchor-identical custom devices stay interpolated while renamed reference anchors stay measured", () => {
+test("anchor-identical custom devices stay interpolated while renamed reference anchors stay literature-exact", () => {
   const custom = makeCustomDevice({ name: "RP2040 clone", cpu: "cortex-m0+", ramKB: 264, flashKB: 2048, clockMHz: 133 });
   assert.equal(simulate(custom, "ml-kem-512").estimatedTimeMs, 35.7);
   assert.equal(simulate(custom, "ml-kem-512").confidenceTier, "interpolated");
 
   const renamedReference = { ...board("rp2040"), id: "pico-reference-renamed" };
-  assert.equal(simulate(renamedReference, "ml-kem-512").confidenceTier, "measured");
+  assert.equal(simulate(renamedReference, "ml-kem-512").confidenceTier, "literature-exact");
 });
 
 test("MWC classifies the reference and custom boundary cases", () => {

@@ -58,7 +58,7 @@ benchmark data so users can explore trade-offs without owning the physical board
 | `rp2040` | Raspberry Pi Pico RP2040 | dual Cortex-M0+ | 264 KB SRAM | 2 MB QSPI | 133 MHz | No DSP/SIMD; worst-case instruction-set benchmark |
 | `nucleo-l4r5zi` | NUCLEO-L4R5ZI | Cortex-M4 | 640 KB | 2 MB | — | Default pqm4 board for largest ML-DSA/SLH-DSA sets |
 
-### 4.2 Algorithm benchmark anchors (measured on Cortex-M0+ @133 MHz unless noted)
+### 4.2 Algorithm benchmark anchors (reported in literature on Cortex-M0+ @133 MHz unless noted)
 
 | Algorithm | Operation | Time | Peak stack | Energy | Signature/key/ct size |
 |---|---|---|---|---|---|

@@ -69,8 +69,7 @@ function computeSimulation(device, algo) {
   const cpu = customCpu(device);
   const architectureExcluded = ["avr-8bit", "msp430-16bit"].includes(device.cpu);
   const hasTimeAnchor = Number.isFinite(algo.timeMs) && !architectureExcluded;
-  // Source anchors are M0+ at 133 MHz. Unknown reference-board clocks use
-  // 133 MHz as an explicit nominal assumption.
+  // Source anchors are M0+ at 133 MHz; reference boards carry documented clocks.
   const targetClock = Number(device.clockMHz) || 133;
   const timeScale = scaleTimeMs({ timeMs: 1, anchorCpu: "cortex-m0+", anchorClockMHz: 133, targetCpu: cpu, targetClockMHz: targetClock });
   const exactAnchor = device.isReference === true && cpu === "cortex-m0+" && Number(device.clockMHz) === 133 && hasTimeAnchor;
@@ -79,9 +78,9 @@ function computeSimulation(device, algo) {
   const estimatedStackKB = algo.stackKB ?? null;
   const variance = architectureExcluded ? { p50Ms: null, p95Ms: null, p99Ms: null, p95ConfidenceTier: "unsupported", model: "unsupported architecture" } : estimateVariance(algo, timeScale);
   const mwc = classifyDevice(device, [algo]);
-  const baseTier = !hasTimeAnchor ? "unsupported" : exactAnchor ? "measured" : ["cortex-m0", "cortex-m0+"].includes(cpu) ? "interpolated" : "extrapolated";
+  const baseTier = !hasTimeAnchor ? "unsupported" : exactAnchor ? "literature-exact" : ["cortex-m0", "cortex-m0+"].includes(cpu) ? "interpolated" : "extrapolated";
   const confidenceTier = variance.model === "linear-percentile-fallback" ? "interpolated" : baseTier;
-  const confidenceReason = architectureExcluded ? `Unsupported for numeric simulation: architecture class excluded (${device.cpu}).` : variance.model === "linear-percentile-fallback" ? "The log-normal p99 estimate differed from the reported p99 by more than 15%; percentile interpolation was used." : confidenceTier === "measured" ? "Directly matches the RP2040 @133 MHz literature anchor." : confidenceTier === "interpolated" ? "Scaled from an M0+ anchor on the same CPU feature family." : confidenceTier === "extrapolated" ? "Scaled from an M0+ anchor across a CPU feature family." : "No numeric timing anchor exists for this algorithm.";
+  const confidenceReason = architectureExcluded ? `Unsupported for numeric simulation: architecture class excluded (${device.cpu}).` : variance.model === "linear-percentile-fallback" ? "The log-normal p99 estimate differed from the reported p99 by more than 15%; percentile interpolation was used." : confidenceTier === "literature-exact" ? "Directly matches the RP2040 @133 MHz literature anchor; this is not a project hardware measurement." : confidenceTier === "interpolated" ? "Scaled from an M0+ anchor on the same CPU feature family." : confidenceTier === "extrapolated" ? "Scaled from an M0+ anchor across a CPU feature family." : "No numeric timing anchor exists for this algorithm.";
   return {
     device, algorithm: algo, algo, engineVersion: activeEngineVersion, dataVersion: DATA_VERSION,
     estimatedTimeMs, estimatedStackKB: architectureExcluded ? null : estimatedStackKB, estimatedFlashKB: algo.flashFootprintKB ?? null, estimatedEnergyMJ,
@@ -94,6 +93,7 @@ function computeSimulation(device, algo) {
     isExtrapolated: confidenceTier === "interpolated" || confidenceTier === "extrapolated",
     unsupportedReason: confidenceTier === "unsupported" ? confidenceReason : null,
     assumptions: [
+      ...(device.clockIsNominal ? ["Datasheet maximum clock used as a nominal projection; actual board clock may differ."] : []),
       ...(device.clockMHz == null ? ["Reference device clock is unspecified; 133 MHz was assumed for time projection and the 48 MHz MWC eligibility floor."] : []),
       ...(architectureExcluded ? [confidenceReason] : []),
       ...(cpu === "cortex-m4" || cpu === "cortex-m7" ? ["Cortex-M4/M7 speedup modeled as 1.85× over M0+."] : []),

@@ -30,7 +30,7 @@ export function getFullMatrix(deviceList = devices, algoList = algorithms) {
 }
 
 const safe = (value) => String(value ?? "").normalize("NFKD").replace(/[^\x20-\x7e]/g, "-").replaceAll("\\", "\\\\").replaceAll("(", "\\(").replaceAll(")", "\\)");
-const color = { reliable: "0.85 0.95 0.89", marginal: "1 0.93 0.78", infeasible: "0.99 0.87 0.86" };
+const color = { reliable: "0.85 0.95 0.89", marginal: "1 0.93 0.78", infeasible: "0.99 0.87 0.86", unknown: "0.9 0.91 0.93", "not-applicable": "0.9 0.91 0.93" };
 
 export function createCatalogPdf({ matrix = generateStateMatrix(), algorithmId = "ml-kem-512", metric = "time", dataVersion = "1.2.0", engineVersion = "1.2.0", generatedAt = new Date() } = {}) {
   const algorithm = algorithms.find((item) => item.id === algorithmId) || matrixAlgorithms[0];
@@ -49,7 +49,7 @@ export function createCatalogPdf({ matrix = generateStateMatrix(), algorithmId =
   rows.forEach(({ device, cells }, i) => {
     const y = 785 - i * 16;
     text(24, y, device.name.slice(0, 29), 7); text(200, y, `${device.ramKB} KB`, 7);
-    cells.forEach((cell, j) => { const x = columnStart + j * columnWidth; const verdict = cell.verdict || cell.mwcVerdict || "infeasible"; rect(x, y - 3, columnWidth - 3, 13, color[verdict]); text(x + 3, y, verdict, 6); });
+    cells.forEach((cell, j) => { const x = columnStart + j * columnWidth; const verdict = cell.verdict || cell.mwcVerdict || "infeasible"; rect(x, y - 3, columnWidth - 3, 13, color[verdict] || color.unknown); text(x + 3, y, verdict, 6); });
   });
 
   const values = rows.map(({ device }) => ({ device, result: simulate(device, algorithm) }));

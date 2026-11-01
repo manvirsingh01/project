@@ -42,14 +42,14 @@ Every number the engine returns carries a **confidence tier**, not just a boolea
 
 | Tier | Meaning | Example |
 |---|---|---|
-| `measured` | Directly matches a literature anchor, same device, same algorithm | RP2040 + ML-KEM-512 |
+| `literature-exact` | Directly matches a literature anchor, same device, same algorithm | RP2040 + ML-KEM-512 |
 | `interpolated` | Same CPU family and architecture features (DSP/SIMD) as an anchor, only clock/RAM differ | A custom Cortex-M4 at 96 MHz, between the STM32F4 Discovery's anchor and a slower M4 |
 | `extrapolated` | Different CPU family/feature set than the nearest anchor (e.g. M0+ anchor scaled to a hypothetical Cortex-M7, or vice versa) | Any custom device whose `hasDSP` differs from the nearest same-algorithm anchor |
 | `unsupported` | No anchor exists for this algorithm on any reference device, and the device is too dissimilar to any anchor to extrapolate responsibly | e.g. SLH-DSA full numeric benchmarking (literature only gives signature size, not timing) |
 
 The tier is surfaced everywhere a number appears — CLI `--json` output, web result cards, and
 Playground tooltips — using consistent wording so a user builds accurate trust in the tool:
-`measured` numbers are shown plainly, `interpolated`/`extrapolated` numbers get a `~` prefix
+`literature-exact` numbers are shown plainly, `interpolated`/`extrapolated` numbers get a `~` prefix
 and a one-line "how this was derived" tooltip, and `unsupported` numbers are refused rather
 than guessed (the engine returns `null` with a reason string, never a fabricated figure).
 
@@ -71,7 +71,7 @@ p99   = exp(mu + 2.326 * sigma)        // cross-checked against the literature's
 The derived `p99` is cross-checked against the literature-reported p99 as a sanity test
 (§3.3 of `04-TESTING.md`); if the model and the reported anchor diverge by more than ~15%, the
 engine falls back to literal linear interpolation between reported percentiles instead of the
-log-normal model, and flags the result as `interpolated` rather than `measured` even for a
+log-normal model, and flags the result as `interpolated` rather than `literature-exact` even for a
 reference device, since the shown p95 would otherwise be a model artifact, not a cited figure.
 
 ### 1.4 Benchmark metrics catalog (full list the engine can report)
@@ -165,7 +165,7 @@ run with no human watching. The alerting layer makes crossing an important thres
 | High tail-latency risk | signature `p99Ms` exceeds a user-settable RTOS watchdog threshold (default 1000 ms, matching the report's ML-DSA-87 case) | Warning |
 | Low handshake reliability | network `successProbability < 0.8` at the configured loss rate | Warning |
 | Fragmentation blow-up | `fragmentCount > 20` for a single payload on a constrained link | Info |
-| Extrapolation confidence drop | result tier is `extrapolated` or `unsupported` (§1.2) rather than `measured`/`interpolated` | Info |
+| Extrapolation confidence drop | result tier is `extrapolated` or `unsupported` (§1.2) rather than `literature-exact`/`interpolated` | Info |
 | Regression vs. last run | (CLI history mode only) a result for the same input is worse than the previous recorded run by more than a configurable % | Warning |
 
 Severities are deliberately reused across surfaces (`critical` / `warning` / `info`) so the

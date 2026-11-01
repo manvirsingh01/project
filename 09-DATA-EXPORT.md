@@ -42,7 +42,7 @@ cv_percent,              // sign operation only
 p99_ms,                  // sign operation only
 mwc_verdict,
 confidence_tier,
-data_source,             // literature-anchor | extrapolated | measured-live
+data_source,             // unavailable | literature-anchor | extrapolated | measured-live | simulated-illustrative
 device_firmware_hash,    // populated for measured-live rows
 source_citation
 ```
@@ -63,7 +63,7 @@ existing rule (already used throughout `benchmark-data/*.json`: *"null means the
 not provide a numeric anchor; it is intentionally not replaced with a guess"*):
 
 - `full_handshake` rows for ML-KEM-512/768/1024: populated directly from the literature anchors
-  (35.7 / 56.6 / 85.7 ms), `confidence_tier = measured`.
+  (35.7 / 56.6 / 85.7 ms), `confidence_tier = literature-exact`.
 - `keygen` / `encapsulate` / `decapsulate` sub-rows for ML-KEM: `time_ms = null`,
   `confidence_tier = unsupported`, with a note field explaining *"source reports only the
   combined handshake time; no per-phase split is published."* The row still exists — with
@@ -137,7 +137,7 @@ core.getOperationLevelData(deviceList, algoList):
                                                         // or keygen/sign/verify
         anchor = lookupAnchor(algo, operation)         // null if source doesn't publish it
         result = anchor != null
-          ? core.simulate(device, algo, operation)     // measured or extrapolated, per §1.2 of
+          ? core.simulate(device, algo, operation)     // literature-exact or extrapolated, per §1.2 of
                                                          // 05-BENCHMARKING.md
           : { time_ms: null, confidence_tier: "unsupported", note: "no published per-phase figure" }
         rows.push({ device, algo, operation, ...result })

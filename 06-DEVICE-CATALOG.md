@@ -14,12 +14,12 @@ short on purpose: one line of spec, one line of verdict.
 
 | ID | Board | CPU | RAM | Flash | Clock | One-line verdict |
 |---|---|---|---|---|---|---|
-| `stm32l031` | STM32L031 (ultra-low-power) | Cortex-M0+ | 8 KB | 32 KB | 32 MHz | ML-KEM-512 only, marginal; no signing |
-| `nrf51822` | nRF51822 (BLE SoC) | Cortex-M0 | 16 KB | 256 KB | 16 MHz | ML-KEM-512 marginal; ML-DSA infeasible |
+| `stm32l031` | STM32L031 (ultra-low-power) | Cortex-M0+ | 8 KB | 32 KB | 32 MHz | infeasible; no signing |
+| `nrf51822` | nRF51822 (BLE SoC) | Cortex-M0 | 16 KB | 256 KB | 16 MHz | infeasible |
 | `stm32l053` | STM32L053 | Cortex-M0+ | 8 KB | 64 KB | 32 MHz | same tier as stm32l031; RAM is the binding limit |
 | `attiny-avr` | ATtiny/ATmega-class (8-bit AVR) | 8-bit AVR | 2 KB | 32 KB | 16 MHz | infeasible — wrong architecture class entirely |
 | `msp430fr` | MSP430FR5969 | 16-bit MSP430 | 2 KB | 64 KB | 16 MHz | infeasible — below the 32-bit floor in the MWC rule |
-| `cw308-stm32f3` | *(existing reference board)* | Cortex-M4 | 40 KB | 256 KB | — | ML-KEM reliable; ML-DSA infeasible |
+| `cw308-stm32f3` | *(existing reference board)* | Cortex-M4 | 40 KB | 256 KB | 72 MHz | ML-KEM marginal; ML-DSA infeasible |
 
 Notes on how these were derived (confidence tiers from `05-BENCHMARKING.md` §1.2):
 
@@ -82,7 +82,7 @@ the following detail is generated and attached to it, so the "short" one-line ca
 §1 always has a full record behind it:
 
 1. **Identity** — id, name, CPU family, RAM, flash, clock, DSP flag, radio type.
-2. **Confidence tier** — measured / interpolated / extrapolated / unsupported (§1.2 of
+2. **Confidence tier** — literature-exact / interpolated / extrapolated / unsupported (§1.2 of
    `05-BENCHMARKING.md`), assigned automatically based on how close the device sits to an
    existing anchor.
 3. **Per-algorithm row** — for every supported algorithm (ML-KEM-512/768/1024, ML-DSA-44/65/87),

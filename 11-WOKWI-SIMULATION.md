@@ -64,15 +64,11 @@ wokwi-projects/
 │   ├── diagram.json      # Pico + 3 LEDs (keygen/encaps/decaps) + resistors
 │   ├── main.cpp
 │   └── wokwi.toml
-├── stm32-generic/
-│   ├── diagram.json
-│   ├── main.cpp
-│   └── wokwi.toml
 ├── attiny-avr/
 │   ├── diagram.json
 │   ├── main.ino
 │   └── wokwi.toml
-└── README.md              # which real_or_stub library each project uses, and why
+└── README.md              # project notes
 ```
 
 ## 5. Embedding in the web app
@@ -129,7 +125,7 @@ wokwi-projects/
 | Embedded Wokwi iframe loads for `rp2040` | simulation boots, serial output begins printing within a reasonable timeout |
 | Selecting a device with no Wokwi mapping (`cw308-stm32f3`) | Hardware Sim tab shows the "not available" message, no broken iframe |
 | LED state in the embedded view | matches the most recently parsed serial `operation` line — i.e., if serial says `encapsulate` just completed, the encapsulate LED is the one lit, not a stale one |
-| Captured `simulated-illustrative` reading | never overwrites or is displayed merged with a `literature-anchor`, `extrapolated`, or `measured-live` value for the same cell — always a clearly separate, labeled entry |
+| Captured `simulated-illustrative` reading | never overwrites or is displayed merged with an `unavailable`, `literature-anchor`, `extrapolated`, or `measured-live` value for the same cell — always a clearly separate, labeled entry |
 | "Reset to default wiring" | reloads the embedded view to the committed `diagram.json`, discarding any in-session edits in that embedded view only |
 | Report tab | contains the §7 disclosure paragraph verbatim-equivalent, so the limitation is never silently dropped from user-facing text |
 

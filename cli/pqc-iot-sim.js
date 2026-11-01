@@ -3,7 +3,7 @@ import { appendFile, readFile, writeFile, mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { algorithms, DATA_VERSION, ENGINE_VERSION, devices, getAlgorithm, getDevice, makeCustomDevice, modelNetwork, networkCacheKey, simulationCacheKey, simulate } from "../core/index.js";
+import { algorithms, DATA_VERSION, ENGINE_VERSION, devices, getAlgorithm, getDevice, getMeasuredResult, importMeasuredResult, listMeasuredResults, makeCustomDevice, modelNetwork, networkCacheKey, simulationCacheKey, simulate } from "../core/index.js";
 import { networkAlerts, regressionAlert, simulationAlerts } from "../core/alerts.js";
 import { createCatalogPdf, generateDeviceCatalog, generateStateMatrix, getFullMatrix } from "../core/deviceCatalog.js";
 import { createNumbersOnlyPdf, getOperationLevelData, operationDataToCsv } from "../core/dataExport.js";
@@ -26,6 +26,7 @@ const configDir = join(homedir(), ".pqc-iot-sim");
 const customPath = join(configDir, "custom-devices.json");
 const cachePath = join(configDir, "cache.json");
 const historyPath = join(configDir, "history.jsonl");
+const measuredPath = join(configDir, "measured-results.json");
 const MAX_DISK_CACHE = 500;
 
 async function readJson(path, fallback) {
@@ -39,6 +40,7 @@ function quote(value) { return `"${String(value ?? "").replaceAll('"', '""')}"`;
 const columns = [
   { name: "Device", value: (r) => r.device.name }, { name: "Algorithm", value: (r) => r.algorithm.name },
   { name: "Mean ms", value: (r) => `${r.confidenceTier === "measured" ? "" : "~"}${r.estimatedTimeMs?.toFixed(1) ?? "Not available"}` },
+  { name: "Live ms", value: (r) => r.measuredLive ? `${r.measuredLive.measurement.meanMs.toFixed(2)} (${r.measuredLive.operation})` : "Not available" },
   { name: "p95 ms", value: (r) => r.estimatedP95Ms?.toFixed(1) ?? "Not available" },
   { name: "p99 ms", value: (r) => r.estimatedP99Ms?.toFixed(1) ?? "Not available" },
   { name: "Stack KB", value: (r) => r.estimatedStackKB ?? "Not available" },
@@ -60,6 +62,12 @@ function requireOption(name) { if (!opt[name]) throw new Error(`Missing required
 function formatVersion() { return `pqc-iot-sim ${"1.0.0"} · data ${DATA_VERSION} · engine ${ENGINE_VERSION}`; }
 
 let diskCache;
+let measuredLoaded = false;
+async function loadMeasured() {
+  if (measuredLoaded) return;
+  for (const result of await readJson(measuredPath, [])) importMeasuredResult(result);
+  measuredLoaded = true;
+}
 async function getDiskCache() {
   if (diskCache) return diskCache;
   const raw = await readJson(cachePath, {});
@@ -187,6 +195,8 @@ const help = `PQC-on-IoT Simulator
 Commands:
   devices list [--json]
   devices add --name NAME --ram KB --flash KB --clock MHZ [--cpu cortex-m0|cortex-m0+|cortex-m4|cortex-m7]
+  measured import --file RESULT.json (KAT and host reference check must pass)
+  measured list [--json]
   matrix [--json] [--export pdf --out FILE] [--metric time|energy] [--algo ID]
   states [--json] [--algo all|kem|signature|ID] [--device-type reference,catalog,custom]
          [--export pdf --out FILE]
@@ -221,6 +231,29 @@ try {
       const item = makeCustomDevice({ name: requireOption("name"), cpu: opt.cpu || "cortex-m0+", ramKB: requireOption("ram"), flashKB: requireOption("flash"), clockMHz: requireOption("clock"), radio: opt.radio || "none" });
       const all = await customDevices(); all.push(item); generateDeviceCatalog(all); await mkdir(dirname(customPath), { recursive: true }); await writeFile(customPath, `${JSON.stringify(all, null, 2)}\n`); json(item);
     } else throw new Error(`Unknown devices action: ${action}`);
+  } else if (command === "measured") {
+    const action = opt._ ?? "list";
+    if (action === "import") {
+      const file = requireOption("file"), incoming = JSON.parse(await readFile(file, "utf8"));
+      const items = Array.isArray(incoming) ? incoming : [incoming];
+      const existing = await readJson(measuredPath, []);
+      for (const item of items) {
+        const result = importMeasuredResult(item);
+        const index = existing.findIndex((old) => old.deviceFingerprint.id === result.deviceFingerprint.id && old.algorithmId === result.algorithmId && old.operation === result.operation);
+        if (index < 0) existing.push(result); else existing[index] = result;
+      }
+      await mkdir(configDir, { recursive: true });
+      await writeFile(measuredPath, `${JSON.stringify(existing, null, 2)}\n`);
+      json({ imported: items.length, path: measuredPath });
+    } else if (action === "list") {
+      for (const result of await readJson(measuredPath, [])) importMeasuredResult(result);
+      const results = listMeasuredResults();
+      if (opt.json) json(results); else table(results, [
+        { name: "Timestamp", value: (r) => r.timestamp }, { name: "Device", value: (r) => `${r.deviceFingerprint.id} @ ${r.deviceFingerprint.clockMHz} MHz` },
+        { name: "Algorithm", value: (r) => r.algorithmId }, { name: "Operation", value: (r) => r.operation },
+        { name: "Mean ms", value: (r) => r.measurement.meanMs }, { name: "Runs", value: (r) => r.measurement.runCount }
+      ]);
+    } else throw new Error(`Unknown measured action: ${action}`);
   } else if (command === "matrix") {
     const matrix = generateStateMatrix(await customDevices());
     if (opt.export === "pdf") {
@@ -260,8 +293,10 @@ try {
       table(rows, columns);
     }
   } else if (command === "simulate") {
+    await loadMeasured();
     const profiles = await customDevices(), deviceId = requireOption("device"), algoId = requireOption("algo");
     const result = await cachedSimulate(deviceId, algoId, profiles, !opt["no-cache"]);
+    const measuredLive = getMeasuredResult(result.device.id, result.algorithm.id);
     const watchdogMs = Number(opt["watchdog-ms"] || 1000), alerts = simulationAlerts(result, { watchdogMs });
     if (opt.record) {
       const history = await loadHistory(), old = previousFor(history, result.device.id, result.algorithm.id);
@@ -269,11 +304,13 @@ try {
       if (regression) alerts.push(regression);
       await appendHistory(result.device, result.algorithm, result, alerts);
     }
-    if (opt.json) json({ ...result, alerts }); else render([result], opt.csv ? "csv" : "table");
+    const outputResult = { ...result, measuredLive };
+    if (opt.json) json({ ...outputResult, alerts }); else render([outputResult], opt.csv ? "csv" : "table");
     writeAlerts(alerts);
     exitForAlerts(alerts);
   } else if (command === "export" && ((!opt.device && !opt.algo) || opt["numbers-only"] || opt.format === "pdf")) {
     if (Boolean(opt.device) !== Boolean(opt.algo)) throw new Error("Use both --device and --algo for scenario export, or omit both for the operation-level dataset.");
+    await loadMeasured();
     const format = opt.format || (opt["numbers-only"] ? "pdf" : "csv"), rawRows = getOperationLevelData([...devices, ...await customDevices()]);
     if (opt["numbers-only"] && (opt.device || opt.algo)) throw new Error("Numbers-only PDF export covers the full operation-level dataset; omit --device and --algo.");
     let output;
@@ -290,6 +327,7 @@ try {
       else process.stdout.write(output);
     }
   } else if (command === "compare" || command === "export") {
+    await loadMeasured();
     const deviceIds = requireOption("device").split(","), algoIds = requireOption("algo").split(",");
     const pairs = deviceIds.length === 1 ? algoIds.map((algo) => ({ device: deviceIds[0], algo })) : algoIds.length === 1 ? deviceIds.map((device) => ({ device, algo: algoIds[0] })) : deviceIds.map((device, i) => ({ device, algo: algoIds[i] }));
     if (deviceIds.length > 1 && algoIds.length > 1 && deviceIds.length !== algoIds.length) throw new Error("Use one algorithm for multiple devices, one device for multiple algorithms, or equal-length lists.");
@@ -303,7 +341,7 @@ try {
         if (regression) alerts.push(regression);
         await appendHistory(result.device, result.algorithm, result, alerts);
       }
-      results.push({ ...result, alerts }); combinedAlerts.push(...alerts.map((alert) => ({ ...alert, deviceId: result.device.id, algoId: result.algorithm.id })));
+      results.push({ ...result, measuredLive: getMeasuredResult(result.device.id, result.algorithm.id), alerts }); combinedAlerts.push(...alerts.map((alert) => ({ ...alert, deviceId: result.device.id, algoId: result.algorithm.id })));
     }
     const format = command === "export" ? requireOption("format") : opt.json ? "json" : opt.csv ? "csv" : "table";
     let output;

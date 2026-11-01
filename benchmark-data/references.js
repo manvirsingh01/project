@@ -17,7 +17,8 @@ export const researchTools = [
   { name: "mupq", role: "PQC benchmarking harness associated with pqm4 and related research.", integration: "Not integrated; cited for provenance only." },
   { name: "QEMU 5.2", role: "ARM Cortex-M emulation cited in relation to stack profiling.", integration: "Not used by this project." },
   { name: "pqriscv", role: "Cycle-accurate RISC-V simulation cited in the hardware/software co-design context.", integration: "Out of scope; not used by this project." },
-  { name: "LoRaSim", role: "LPWAN discrete-event simulation cited as background for network modeling.", integration: "Not integrated; the project uses its own analytic fragmentation/loss model." }
+  { name: "LoRaSim", role: "LPWAN discrete-event simulation cited as background for network modeling.", integration: "Not integrated; the project uses its own analytic fragmentation/loss model." },
+  { name: "Wokwi", role: "Browser-based microcontroller and peripheral simulator for illustrative firmware execution.", integration: "Local RP2040 and ATtiny85 stub projects are included; timing is not cryptographic or silicon-accurate, and no iframe embed is claimed." }
 ];
 
 export const worksCited = [
@@ -57,6 +58,7 @@ export const technologies = [
   { name: "JavaScript benchmark data module", usage: "Source-tagged device, algorithm, network, and reference records in benchmark-data/.", status: "Used; upstream notes propose JSON files, but this repo uses an ES module." },
   { name: "Built-in PDF writer", usage: "Client-side and CLI PDF generation without a runtime dependency.", status: "Used" },
   { name: "node:test", usage: "Data, core, CLI, and web-surface tests.", status: "Used" },
+  { name: "Wokwi project files", usage: "Optional RP2040 and ATtiny85 illustrative dummy-workload sketches with phase LEDs and serial output.", status: "Used; no PQC library is linked" },
   { name: "TypeScript", usage: "Mentioned by the design notes for a typed engine.", status: "Not integrated; current source is JavaScript." },
   { name: "React / Chart.js", usage: "Optional approaches mentioned in the source notes.", status: "Not integrated; current app uses vanilla JavaScript and SVG." },
   { name: "External runtime packages", usage: "Application dependencies.", status: "None; the project uses built-in platform APIs." }
@@ -71,5 +73,7 @@ export const documentMap = [
   ["06-DEVICE-CATALOG.md", "Extended low-RAM device set, comparison matrix, and PDF export"],
   ["07-STATES-DASHBOARD.md", "Consolidated device/algorithm matrix, charts, and state details"],
   ["08-REFERENCES.md", "Primary sources, standards, research tools, bibliography index, and technology map"],
-  ["09-DATA-EXPORT.md", "Operation-level CSV/JSON and numbers-only PDF dataset export"]
+  ["09-DATA-EXPORT.md", "Operation-level CSV/JSON and numbers-only PDF dataset export"],
+  ["10-REAL-PQC-PIPELINE.md", "Real-hardware firmware, collector, and measured-live result pipeline"],
+  ["11-WOKWI-SIMULATION.md", "Wokwi-supported board mappings, illustrative projects, and Hardware Sim view"]
 ];

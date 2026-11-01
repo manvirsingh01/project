@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "author": "PQC-on-IoT Simulator",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-attiny85", "id": "tiny", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-resistor", "id": "r1", "top": -40, "left": 190, "attrs": { "value": "220" } },
+    { "type": "wokwi-led", "id": "led1", "top": -50, "left": 260, "attrs": { "color": "red" } },
+    { "type": "wokwi-resistor", "id": "r2", "top": 15, "left": 190, "attrs": { "value": "220" } },
+    { "type": "wokwi-led", "id": "led2", "top": 5, "left": 260, "attrs": { "color": "green" } },
+    { "type": "wokwi-resistor", "id": "r3", "top": 70, "left": 190, "attrs": { "value": "220" } },
+    { "type": "wokwi-led", "id": "led3", "top": 60, "left": 260, "attrs": { "color": "blue" } }
+  ],
+  "connections": [
+    [ "tiny:PB2", "r1:1", "red", [] ], [ "r1:2", "led1:A", "red", [] ], [ "led1:C", "tiny:GND", "black", [] ],
+    [ "tiny:PB3", "r2:1", "green", [] ], [ "r2:2", "led2:A", "green", [] ], [ "led2:C", "tiny:GND", "black", [] ],
+    [ "tiny:PB4", "r3:1", "blue", [] ], [ "r3:2", "led3:A", "blue", [] ], [ "led3:C", "tiny:GND", "black", [] ],
+    [ "$serialMonitor:TX", "tiny:PB0", "", [] ], [ "$serialMonitor:RX", "tiny:PB1", "", [] ]
+  ],
+  "serialMonitor": { "display": "always", "newline": "lf" }
+}

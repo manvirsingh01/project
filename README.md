@@ -2,6 +2,8 @@
 
 A small browser app and Node CLI for exploring literature-based post-quantum cryptography projections on constrained IoT hardware. The browser includes a network Playground with swappable sender/receiver profiles, an optional relay, animated exchange and fragment flow, and MWC feedback. This is a modeling tool; it does not implement cryptographic primitives or run operations on hardware.
 
+An optional Hardware Sim view links local Wokwi RP2040 and ATtiny85 stub projects to serial-output import. These execute dummy workloads for educational peripheral/firmware flow only; their timings are not PQC benchmarks.
+
 ## Run locally
 
 Requires Node.js 18+ and Python 3 (for the static web server). There are no npm dependencies.
@@ -24,12 +26,21 @@ node cli/pqc-iot-sim.js export --out pqc-iot-data.csv
 node cli/pqc-iot-sim.js export --format pdf --numbers-only --out pqc-iot-data.pdf
 node cli/pqc-iot-sim.js references
 node cli/pqc-iot-sim.js simulate --device rp2040 --algo ml-kem-512
+node cli/pqc-iot-sim.js measured import --file board-run.json
+node cli/pqc-iot-sim.js measured list --json
 node cli/pqc-iot-sim.js network --algo ml-dsa-44 --link 802.15.4 --hops 1 --loss 0.02
 node cli/pqc-iot-sim.js compare --device rp2040,stm32f4-disco --algo ml-kem-512 --json
 node cli/pqc-iot-sim.js report --format md
 ```
 
+The Wokwi project sources are in `wokwi-projects/`. Build a project with PlatformIO (`pio run`)
+from its directory, then run it with Wokwi for VS Code or `wokwi-cli .` (Wokwi CLI setup may
+require a Wokwi CI token). The browser opens a blank board editor; copy the included sketch and
+diagram there to run it online. Paste serial rows into Hardware Sim to compare them separately.
+
 `npm link` makes `pqc-iot-sim` available as a local command. Custom CLI profiles are stored in `~/.pqc-iot-sim/custom-devices.json`; the browser and CLI profiles are separate by design.
+
+Real-hardware results that pass both the on-device KAT and host reference check can be imported with `measured import`; the CLI stores them under `~/.pqc-iot-sim/measured-results.json`. The browser accepts the same JSON from the Simulator view and stores it in local storage. Imported values are tagged `measured-live` and shown separately from modeled estimates. The firmware harness and serial collector described in `10-REAL-PQC-PIPELINE.md` still require a target board, toolchain, and vetted PQC library.
 
 ## Tests
 

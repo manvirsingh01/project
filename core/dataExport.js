@@ -1,11 +1,13 @@
 import { algorithms, devices } from "../benchmark-data/index.js";
 import { simulate } from "./index.js";
+import { listMeasuredResults } from "./measuredResults.js";
+import { listWokwiResults } from "./wokwi.js";
 
 export const DATA_EXPORT_COLUMNS = [
   "device_id", "device_cpu", "device_ram_kb", "device_flash_kb", "device_clock_mhz",
   "algo_id", "algo_family", "security_level", "operation", "time_ms", "stack_kb",
   "energy_mj", "payload_bytes", "cv_percent", "p99_ms", "mwc_verdict",
-  "confidence_tier", "source_citation", "note"
+  "confidence_tier", "data_source", "device_firmware_hash", "source_citation", "note"
 ];
 
 function operationPlan(algo) {
@@ -57,11 +59,45 @@ export function getOperationLevelData(deviceList = devices, algoList = algorithm
           p99_ms: operation === "sign" ? result.estimatedP99Ms ?? null : null,
           mwc_verdict: result.mwcVerdict,
           confidence_tier: available ? result.confidenceTier : "unsupported",
+          data_source: result.isExtrapolated ? "extrapolated" : "literature-anchor",
+          device_firmware_hash: null,
           source_citation: algo.source,
           note
         });
       }
     }
+  }
+  const deviceIds = new Set(deviceList.map((device) => device.id));
+  const algoIds = new Set(algoList.map((algo) => algo.id));
+  for (const live of listMeasuredResults()) {
+    if (!deviceIds.has(live.deviceFingerprint.id) || !algoIds.has(live.algorithmId)) continue;
+    const device = live.deviceFingerprint, algo = algoList.find((item) => item.id === live.algorithmId);
+    rows.push({
+      device_id: device.id, device_cpu: device.cpu ?? null, device_ram_kb: device.ramKB ?? null,
+      device_flash_kb: device.flashKB ?? null, device_clock_mhz: device.clockMHz,
+      algo_id: algo.id, algo_family: algo.family, security_level: algo.level, operation: live.operation,
+      time_ms: live.measurement.meanMs, stack_kb: live.measurement.stackKB ?? null,
+      energy_mj: live.measurement.energyMJ ?? null, payload_bytes: algo.payloadBytes ?? null,
+      cv_percent: live.measurement.cvPercent ?? null, p99_ms: live.measurement.p99Ms ?? null,
+      mwc_verdict: null, confidence_tier: "measured-live", data_source: "measured-live",
+      device_firmware_hash: device.firmwareBuildHash, source_citation: "On-device PQC harness",
+      note: `${live.measurement.runCount} runs; KAT and host reference checks passed; captured ${live.timestamp}.`
+    });
+  }
+  for (const simulated of listWokwiResults()) {
+    if (!deviceIds.has(simulated.deviceId) || !algoIds.has(simulated.algorithmId)) continue;
+    const device = deviceList.find((item) => item.id === simulated.deviceId), algo = algoList.find((item) => item.id === simulated.algorithmId);
+    rows.push({
+      device_id: device.id, device_cpu: device.cpu, device_ram_kb: device.ramKB,
+      device_flash_kb: device.flashKB, device_clock_mhz: device.clockMHz ?? null,
+      algo_id: algo.id, algo_family: algo.family, security_level: algo.level,
+      operation: simulated.operation, time_ms: simulated.elapsedMs, stack_kb: null,
+      energy_mj: null, payload_bytes: algo.payloadBytes ?? null, cv_percent: null,
+      p99_ms: null, mwc_verdict: null, confidence_tier: "simulated-illustrative",
+      data_source: "simulated-illustrative", device_firmware_hash: null,
+      source_citation: "Wokwi dummy workload",
+      note: `${simulated.implementation} workload; not cryptographic execution; captured ${simulated.capturedAt}.`
+    });
   }
   return rows;
 }
@@ -72,7 +108,7 @@ export function operationDataToCsv(rows) {
 }
 
 const pdfText = (value) => String(value ?? "—").normalize("NFKD").replaceAll("—", "@@EMDASH@@").replaceAll("–", "-").replace(/[^\x20-\x7e@]/g, "-").replaceAll("\\", "\\\\").replaceAll("(", "\\(").replaceAll(")", "\\)").replaceAll("@@EMDASH@@", "\\227");
-const columnWidths = [82, 78, 40, 43, 45, 80, 52, 28, 75, 48, 42, 45, 48, 42, 44, 65, 74, 198, 290];
+const columnWidths = [82, 78, 40, 43, 45, 80, 52, 28, 75, 48, 42, 45, 48, 42, 44, 65, 74, 80, 85, 170, 250];
 const headers = DATA_EXPORT_COLUMNS.map((column) => column.replaceAll("_", " "));
 
 export function createNumbersOnlyPdf(rows, { deviceCount = new Set(rows.map((row) => row.device_id)).size, algorithmCount = new Set(rows.map((row) => row.algo_id)).size, dataVersion = "1.2.0", engineVersion = "1.2.0", generatedAt = new Date() } = {}) {

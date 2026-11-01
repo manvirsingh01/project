@@ -1,6 +1,7 @@
 import { algorithms, DATA_VERSION, devices, network } from "../benchmark-data/index.js";
 import { classifyDevice } from "./mwcRules.js";
 import { estimateVariance } from "./variance.js";
+export { getMeasuredResult, importMeasuredResult, listMeasuredResults, validateMeasuredResult } from "./measuredResults.js";
 
 export { algorithms, DATA_VERSION, devices, network };
 export { classifyDevice } from "./mwcRules.js";

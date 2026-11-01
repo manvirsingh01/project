@@ -1,13 +1,19 @@
-import { algorithms, classifyDevice, DATA_VERSION, devices, ENGINE_VERSION, makeCustomDevice, modelNetwork, simulate } from "../core/index.js";
+import { algorithms, classifyDevice, DATA_VERSION, devices, ENGINE_VERSION, getMeasuredResult, importMeasuredResult, listMeasuredResults, makeCustomDevice, modelNetwork, simulate, validateMeasuredResult } from "../core/index.js";
 import { networkAlerts, simulationAlerts } from "../core/alerts.js";
 import { createCatalogPdf, generateDeviceCatalog, generateStateMatrix, getFullMatrix } from "../core/deviceCatalog.js";
 import { documentMap, projectSources, researchTools, sourceCrosswalk, standards, technologies, worksCited } from "../benchmark-data/references.js";
 import { createNumbersOnlyPdf, getOperationLevelData, operationDataToCsv } from "../core/dataExport.js";
+import { wokwiBoards } from "../benchmark-data/wokwi.js";
+import { getWokwiResult, importWokwiResult, listWokwiResults, parseWokwiSerial } from "../core/wokwi.js";
 
 const $ = (q) => document.querySelector(q);
 const $$ = (q) => [...document.querySelectorAll(q)];
 const customKey = "pqc-iot-sim.custom-devices.v1";
+const measuredKey = "pqc-iot-sim.measured-live.v1";
+const wokwiKey = "pqc-iot-sim.wokwi-illustrative.v1";
 let customs = loadCustoms();
+loadMeasuredResults();
+loadWokwiResults();
 let compareResults = [];
 let pairState = [{ device: "rp2040", algo: "ml-kem-512" }, { device: "stm32f4-disco", algo: "ml-kem-512" }];
 let latestResult = null;
@@ -19,6 +25,15 @@ const pgTimers = new Map();
 
 function loadCustoms() { try { const value = JSON.parse(localStorage.getItem(customKey) || "[]"); return Array.isArray(value) ? value : []; } catch { return []; } }
 function saveCustoms() { try { localStorage.setItem(customKey, JSON.stringify(customs)); } catch { toast("Browser storage is unavailable; this profile will not persist after reload."); } }
+function loadMeasuredResults() {
+  try {
+    const results = JSON.parse(localStorage.getItem(measuredKey) || "[]");
+    if (Array.isArray(results)) for (const result of results) importMeasuredResult(result);
+  } catch { try { localStorage.removeItem(measuredKey); } catch {} }
+}
+function saveMeasuredResults() { localStorage.setItem(measuredKey, JSON.stringify(listMeasuredResults())); }
+function loadWokwiResults() { try { const saved = JSON.parse(localStorage.getItem(wokwiKey) || "[]"); if (Array.isArray(saved)) saved.forEach(importWokwiResult); } catch { try { localStorage.removeItem(wokwiKey); } catch {} } }
+function saveWokwiResults() { localStorage.setItem(wokwiKey, JSON.stringify(listWokwiResults())); }
 function esc(value) { return String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]); }
 function allDevices() { return [...devices, ...customs]; }
 function toast(message) { const node = $("#toast"); node.textContent = message; node.classList.add("show"); clearTimeout(toast.timer); toast.timer = setTimeout(() => node.classList.remove("show"), 2700); }
@@ -91,7 +106,9 @@ function statesSelectedDevices() {
 }
 function stateCellMarkup(result) {
   const time = Number.isFinite(result.estimatedTimeMs) ? `${result.confidenceTier === "measured" ? "" : "~"}${format(result.estimatedTimeMs, " ms", 1)}` : "time unavailable";
-  return `<button class="state-cell ${result.mwcVerdict}" data-state-device="${esc(result.device.id)}" data-state-algo="${esc(result.algorithm.id)}" title="${esc(result.mwcReasons.join(" "))}">${esc(result.mwcVerdict)}<small>${esc(time)}</small></button>`;
+  const live = getMeasuredResult(result.device.id, result.algorithm.id);
+  const simulated = getWokwiResult(result.device.id, result.algorithm.id);
+  return `<button class="state-cell ${result.mwcVerdict}" data-state-device="${esc(result.device.id)}" data-state-algo="${esc(result.algorithm.id)}" title="${esc(result.mwcReasons.join(" "))}">${esc(result.mwcVerdict)}${live ? `<small>LIVE · ${format(live.measurement.meanMs, " ms", 1)}</small>` : simulated ? `<small>SIM · ${format(simulated.elapsedMs, " ms", 3)}</small>` : `<small>${esc(time)}</small>`}</button>`;
 }
 function renderStateMatrix(matrix, algoList) {
   $("#states-matrix").innerHTML = matrix.length ? `<table class="data-table"><thead><tr><th>Device (RAM)</th>${algoList.map((algo) => `<th>${esc(algo.name)}</th>`).join("")}</tr></thead><tbody>${matrix.map(({ device, cells }) => `<tr><td><b>${esc(device.name)}</b><br><span class="tagline">${device.ramKB} KB · ${esc(device.id)}</span></td>${cells.map(stateCellMarkup).map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("")}</tbody></table>` : `<div class="notice info">No devices match these filters.</div>`;
@@ -366,7 +383,9 @@ function renderSimulation(result) {
   const critical = alerts.find((alert) => alert.severity === "critical");
   const banner = critical ? `<div class="alert-banner critical" role="alert"><b>${esc(critical.message)}</b><button class="alert-dismiss" data-dismiss-alert aria-label="Dismiss alert">×</button></div>` : "";
   const infoAlert = alerts.find((alert) => alert.rule === "confidence");
-  $("#sim-result").innerHTML = `${banner}<div class="result-top"><div><h2>${esc(result.algorithm.name)}</h2><p>${esc(result.device.name)} · <span class="confidence ${esc(result.confidenceTier)}" title="${esc(result.confidenceReason)}">${esc(result.confidenceTier)}</span></p></div>${status(result.mwcVerdict)}</div><div class="result-metrics"><div class="result-stat"><small>Mean execution time</small><b title="${esc(result.confidenceReason)}">${tierFormat(result, result.estimatedTimeMs, " ms", 1)}</b></div><div class="result-stat"><small>Peak stack</small><b>${format(result.estimatedStackKB, " KB", 1)}</b></div><div class="result-stat"><small>Firmware flash</small><b title="${esc(result.flashFootprintReason)}">${format(result.estimatedFlashKB, " KB", 1)}</b></div><div class="result-stat"><small>Energy / operation</small><b>${tierFormat(result, result.estimatedEnergyMJ, " mJ", 2)}</b></div></div>${variance}<div class="result-foot"><span class="info" title="${esc(infoAlert?.message || result.confidenceReason)}">ⓘ</span><span>Device flash: ${result.device.flashKB.toLocaleString()} KB. ${esc(result.flashFootprintReason)} ${assumptions.map(esc).join(" ")}<br>Algorithm source: ${esc(result.algorithm.source)}<br>Device source: ${esc(result.device.source || "User-defined profile")}<br>Data ${esc(result.dataVersion)} · Engine ${esc(result.engineVersion)}</span></div><div class="notice ${result.mwcVerdict === "reliable" ? "info" : "warn"}"><b>MWC: ${esc(result.mwcVerdict)}</b> — ${esc(result.mwcReasons.join(" "))}</div>`;
+  const live = getMeasuredResult(result.device.id, result.algorithm.id);
+  const liveMarkup = live ? `<div class="notice info"><b>Measured live · ${esc(live.operation)}</b><br>${format(live.measurement.meanMs, " ms", 2)} mean across ${live.measurement.runCount} runs · ${esc(live.deviceFingerprint.firmwareBuildHash)} · ${esc(live.timestamp)}${live.measurement.p95Ms == null ? "" : ` · p95 ${format(live.measurement.p95Ms, " ms", 2)}`}${live.measurement.p99Ms == null ? "" : ` · p99 ${format(live.measurement.p99Ms, " ms", 2)}`}</div>` : "";
+  $("#sim-result").innerHTML = `${banner}<div class="result-top"><div><h2>${esc(result.algorithm.name)}</h2><p>${esc(result.device.name)} · <span class="confidence ${esc(result.confidenceTier)}" title="${esc(result.confidenceReason)}">${esc(result.confidenceTier)}</span></p></div>${status(result.mwcVerdict)}</div><div class="result-metrics"><div class="result-stat"><small>Mean execution time</small><b title="${esc(result.confidenceReason)}">${tierFormat(result, result.estimatedTimeMs, " ms", 1)}</b></div><div class="result-stat"><small>Peak stack</small><b>${format(result.estimatedStackKB, " KB", 1)}</b></div><div class="result-stat"><small>Firmware flash</small><b title="${esc(result.flashFootprintReason)}">${format(result.estimatedFlashKB, " KB", 1)}</b></div><div class="result-stat"><small>Energy / operation</small><b>${tierFormat(result, result.estimatedEnergyMJ, " mJ", 2)}</b></div></div>${liveMarkup}${variance}<div class="result-foot"><span class="info" title="${esc(infoAlert?.message || result.confidenceReason)}">ⓘ</span><span>Device flash: ${result.device.flashKB.toLocaleString()} KB. ${esc(result.flashFootprintReason)} ${assumptions.map(esc).join(" ")}<br>Algorithm source: ${esc(result.algorithm.source)}<br>Device source: ${esc(result.device.source || "User-defined profile")}<br>Data ${esc(result.dataVersion)} · Engine ${esc(result.engineVersion)}</span></div><div class="notice ${result.mwcVerdict === "reliable" ? "info" : "warn"}"><b>MWC: ${esc(result.mwcVerdict)}</b> — ${esc(result.mwcReasons.join(" "))}</div>`;
 }
 
 function renderCompare() {
@@ -376,15 +395,15 @@ function renderCompare() {
   const criticalIds = new Set(compareResults.filter((r) => simulationAlerts(r).some((a) => a.severity === "critical")).map((r) => `${r.device.id}:${r.algorithm.id}`));
   const rowClass = (r) => criticalIds.has(`${r.device.id}:${r.algorithm.id}`) ? "critical-result" : "";
   $("#compare-results").innerHTML = timed.length ? `<div class="chart">${timed.map((r) => `<div class="bar-row ${rowClass(r)}"><div class="chart-label" title="${esc(r.device.name)} / ${esc(r.algorithm.name)} · ${esc(r.confidenceReason)}">${esc(r.device.name)} <span class="confidence ${esc(r.confidenceTier)}">${esc(r.confidenceTier)}</span></div><div class="bar-bg"><div class="bar-fill" style="width:${Math.max(2, r.estimatedTimeMs / max * 100)}%"></div></div><b>${tierFormat(r, r.estimatedTimeMs, " ms", 1)}</b></div>`).join("")}</div><div class="tagline">Critical configurations are outlined in red. Bars scale to the slowest scenario.</div>` : `<div class="notice warn">No selected scenario has a numeric time anchor.</div>`;
-  $("#compare-table").innerHTML = `<table class="data-table"><thead><tr><th>Device</th><th>Algorithm</th><th>Mean</th><th>p95</th><th>p99</th><th>Stack</th><th>Flash</th><th>Energy</th><th>MWC</th><th>Confidence</th></tr></thead><tbody>${compareResults.map((r) => `<tr class="${rowClass(r)}"><td>${esc(r.device.name)}</td><td>${esc(r.algorithm.name)}</td><td>${tierFormat(r, r.estimatedTimeMs, " ms")}</td><td>${tierFormat(r, r.estimatedP95Ms, " ms", 1, r.p95ConfidenceTier)}</td><td>${tierFormat(r, r.estimatedP99Ms, " ms")}</td><td>${format(r.estimatedStackKB, " KB")}</td><td title="${esc(r.flashFootprintReason)}">${format(r.estimatedFlashKB, " KB")}</td><td>${tierFormat(r, r.estimatedEnergyMJ, " mJ", 2)}</td><td>${status(r.mwcVerdict)}</td><td title="${esc(r.confidenceReason)}">${esc(r.confidenceTier)}</td></tr>`).join("")}</tbody></table>`;
+  $("#compare-table").innerHTML = `<table class="data-table"><thead><tr><th>Device</th><th>Algorithm</th><th>Mean</th><th>Measured live</th><th>Simulated illustrative</th><th>p95</th><th>p99</th><th>Stack</th><th>Flash</th><th>Energy</th><th>MWC</th><th>Confidence</th></tr></thead><tbody>${compareResults.map((r) => { const live = getMeasuredResult(r.device.id, r.algorithm.id), simulated = getWokwiResult(r.device.id, r.algorithm.id); return `<tr class="${rowClass(r)}"><td>${esc(r.device.name)}</td><td>${esc(r.algorithm.name)}</td><td>${tierFormat(r, r.estimatedTimeMs, " ms")}</td><td>${live ? `${format(live.measurement.meanMs, " ms", 2)} · ${esc(live.operation)}` : "—"}</td><td>${simulated ? `${format(simulated.elapsedMs, " ms", 3)} · ${esc(simulated.operation)}` : "—"}</td><td>${tierFormat(r, r.estimatedP95Ms, " ms", 1, r.p95ConfidenceTier)}</td><td>${tierFormat(r, r.estimatedP99Ms, " ms")}</td><td>${format(r.estimatedStackKB, " KB")}</td><td title="${esc(r.flashFootprintReason)}">${format(r.estimatedFlashKB, " KB")}</td><td>${tierFormat(r, r.estimatedEnergyMJ, " mJ", 2)}</td><td>${status(r.mwcVerdict)}</td><td title="${esc(r.confidenceReason)}">${esc(r.confidenceTier)}</td></tr>`; }).join("")}</tbody></table>`;
 }
 
 function tableExport(formatType) {
   if (!compareResults.length) { toast("Run a comparison before exporting."); return; }
   let content, type, ext;
-  if (formatType === "json") { content = JSON.stringify(compareResults.map((r) => ({ ...r, alerts: simulationAlerts(r) })), null, 2); type = "application/json"; ext = "json"; }
+  if (formatType === "json") { content = JSON.stringify(compareResults.map((r) => ({ ...r, measuredLive: getMeasuredResult(r.device.id, r.algorithm.id), simulatedIllustrative: getWokwiResult(r.device.id, r.algorithm.id), alerts: simulationAlerts(r) })), null, 2); type = "application/json"; ext = "json"; }
   else {
-    const cols = [["Device", (r) => r.device.name], ["Algorithm", (r) => r.algorithm.name], ["Mean ms", (r) => r.estimatedTimeMs], ["p50 ms", (r) => r.estimatedP50Ms], ["p95 ms", (r) => r.estimatedP95Ms], ["p99 ms", (r) => r.estimatedP99Ms], ["Stack KB", (r) => r.estimatedStackKB], ["Flash KB", (r) => r.estimatedFlashKB], ["Energy mJ", (r) => r.estimatedEnergyMJ], ["MWC", (r) => r.mwcVerdict], ["Confidence", (r) => r.confidenceTier]];
+    const cols = [["Device", (r) => r.device.name], ["Algorithm", (r) => r.algorithm.name], ["Mean ms", (r) => r.estimatedTimeMs], ["Measured live ms", (r) => getMeasuredResult(r.device.id, r.algorithm.id)?.measurement.meanMs], ["Simulated illustrative ms", (r) => getWokwiResult(r.device.id, r.algorithm.id)?.elapsedMs], ["p50 ms", (r) => r.estimatedP50Ms], ["p95 ms", (r) => r.estimatedP95Ms], ["p99 ms", (r) => r.estimatedP99Ms], ["Stack KB", (r) => r.estimatedStackKB], ["Flash KB", (r) => r.estimatedFlashKB], ["Energy mJ", (r) => r.estimatedEnergyMJ], ["MWC", (r) => r.mwcVerdict], ["Confidence", (r) => r.confidenceTier]];
     const q = (x) => `"${String(x ?? "").replaceAll('"', '""')}"`;
     content = [cols.map(([h]) => q(h)).join(","), ...compareResults.map((r) => cols.map(([, fn]) => q(fn(r))).join(","))].join("\n"); type = "text/csv"; ext = "csv";
   }
@@ -404,7 +423,28 @@ function setView(name) {
   $$(".nav button").forEach((el) => el.classList.toggle("active", el.dataset.view === name));
   const active = $(`.nav button[data-view="${name}"]`); $("#crumb").textContent = active?.textContent.trim() || "Overview";
   if (name === "states") renderStatesDashboard();
+  if (name === "hardware") renderHardwareSim();
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function renderHardwareSim() {
+  const deviceId = $("#hw-device").value || "rp2040", mapping = wokwiBoards[deviceId];
+  if (mapping?.algorithmId) {
+    $("#hw-algo").innerHTML = algorithms.filter((item) => item.id === mapping.algorithmId).map((algo) => `<option value="${esc(algo.id)}">${esc(algo.name)}</option>`).join("");
+    $("#hw-algo").value = mapping.algorithmId;
+    $("#hw-algo").disabled = true;
+  } else {
+    $("#hw-algo").disabled = true;
+  }
+  const algorithmId = $("#hw-algo").value || mapping?.algorithmId;
+  const device = allDevices().find((item) => item.id === deviceId), algorithm = algorithms.find((item) => item.id === algorithmId);
+  if (!device || !algorithm) return;
+  $("#hw-project").innerHTML = mapping ? `<div class="notice info"><b>${esc(mapping.label)}</b><br>${esc(mapping.exactness)}. ${mapping.project ? `Local project: <code>wokwi-projects/${esc(mapping.project)}/</code>` : "No project sketch is included for this mapping yet."}</div>${mapping.project ? `<a class="btn primary" target="_blank" rel="noreferrer" href="https://wokwi.com/projects/new/${mapping.project === "rp2040" ? "pi-pico" : "attiny85"}">Open Wokwi editor ↗</a>` : ""}<p class="tagline">The included sketch runs a dummy workload only. Its timing is illustrative, not PQC performance.</p>` : `<div class="notice warn">Hardware simulation not available for ${esc(device.name)}. No supported Wokwi mapping is configured for this catalog profile.</div>`;
+  const literature = simulate(device, algorithm, customs), live = getMeasuredResult(deviceId, algorithmId);
+  const simulated = listWokwiResults().filter((item) => item.deviceId === deviceId && item.algorithmId === algorithmId);
+  $("#hw-results").innerHTML = `<b>Literature / projection:</b> ${format(literature.estimatedTimeMs, " ms", 1)}<br><b>Measured live:</b> ${live ? `${format(live.measurement.meanMs, " ms", 2)} (${esc(live.operation)})` : "none imported"}<br><b>Simulated-illustrative:</b> ${simulated.length ? simulated.map((item) => `${esc(item.operation)} ${format(item.elapsedMs, " ms", 3)}`).join(" · ") : "none captured"}`;
+  const last = simulated.at(-1);
+  $("#hw-phase").textContent = last ? `Last parsed phase: ${last.operation} · ${last.elapsedMs} ms · ${last.implementation} workload · ${last.capturedAt}` : "No phase output captured for this selection.";
 }
 
 $(".nav").addEventListener("click", (event) => { const button = event.target.closest("[data-view]"); if (button) setView(button.dataset.view); });
@@ -420,6 +460,30 @@ $("#view-states").addEventListener("click", (event) => { const button = event.ta
 document.addEventListener("click", (event) => { const go = event.target.closest("[data-go]"); if (go) setView(go.dataset.go); });
 document.addEventListener("click", (event) => { const dismiss = event.target.closest("[data-dismiss-alert]"); if (dismiss) dismiss.closest(".alert-banner")?.remove(); });
 $("#run-sim").addEventListener("click", () => { try { renderSimulation(simulate($("#sim-device").value, $("#sim-algo").value, customs)); } catch (e) { toast(e.message); } });
+$("#measured-import").addEventListener("change", async (event) => {
+  const file = event.target.files?.[0]; if (!file) return;
+  try {
+    const incoming = JSON.parse(await file.text()), results = (Array.isArray(incoming) ? incoming : [incoming]).map(validateMeasuredResult);
+    for (const result of results) importMeasuredResult(result);
+    saveMeasuredResults();
+    if (latestResult) renderSimulation(latestResult);
+    renderStatesDashboard();
+    toast(`Imported ${results.length} KAT-verified live result${results.length === 1 ? "" : "s"}.`);
+  } catch (error) { toast(error.message); }
+  event.target.value = "";
+});
+$("#hw-device").addEventListener("change", renderHardwareSim);
+$("#hw-algo").addEventListener("change", renderHardwareSim);
+$("#hw-import").addEventListener("click", () => {
+  try {
+    const deviceId = $("#hw-device").value;
+    if (!wokwiBoards[deviceId]?.project) throw new Error("This catalog device has no included Wokwi project.");
+    const results = parseWokwiSerial($("#hw-serial").value, { deviceId, algorithmId: $("#hw-algo").value });
+    saveWokwiResults();
+    renderHardwareSim(); renderStatesDashboard();
+    toast(`Imported ${results.length} simulated-illustrative serial reading${results.length === 1 ? "" : "s"}.`);
+  } catch (error) { toast(error.message); }
+});
 $("#add-pair").addEventListener("click", () => { if (pairState.length >= 4) return toast("A comparison supports up to four scenarios."); pairState.push({ device: "rp2040", algo: "ml-kem-512" }); renderPairs(); });
 $("#compare-pairs").addEventListener("change", (e) => { if (e.target.dataset.pairDevice != null) pairState[Number(e.target.dataset.pairDevice)].device = e.target.value; if (e.target.dataset.pairAlgo != null) pairState[Number(e.target.dataset.pairAlgo)].algo = e.target.value; });
 $("#compare-pairs").addEventListener("click", (e) => { const btn = e.target.closest("[data-remove-pair]"); if (btn && pairState.length > 1) { pairState.splice(Number(btn.dataset.removePair), 1); renderPairs(); } });
@@ -460,4 +524,8 @@ $("#device-table").addEventListener("click", (e) => { const edit = e.target.clos
 $("#download-report").addEventListener("click", () => { const report = `# PQC on constrained IoT: model notes\n\nThis tool projects published benchmark anchors; it does not implement cryptographic operations.\n\n## Method\n\nNumeric anchors are from the repository design notes. Times scale linearly with clock and use an assumed 1.85× M4/M7 speedup over M0+. Missing measurements remain unavailable.\n\n## MWC\n\n- Cortex-M0+ or better at 48 MHz or faster.\n- 64 KB RAM for KEM only; 128 KB for local signing.\n- 512 KB minimum flash; 1 MB recommended.\n\n## Network\n\nIEEE 802.15.4 uses 81 B/frame single hop and 45 B/frame multi-hop. Success is (1 - loss)^fragments, assuming independent per-frame loss. LoRa capacity defaults to a configurable 51 B assumption because the notes provide no constant.\n\n## Limitations\n\nEnergy/time scaling is approximate, side-channel behavior is not modeled, and custom profiles are extrapolated. The workspace contains design and implementation Markdown, but no source PDFs or numbered bibliography.\n\nSource: 01-DESIGN.md §§4.1–4.4; 02-IMPLEMENTATION.md §§3, 6, 8.\n`; const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([report], { type: "text/markdown" })); a.download = "pqc-iot-method.md"; a.click(); URL.revokeObjectURL(a.href); });
 
   $("#report-version").textContent = `Benchmark data ${DATA_VERSION} · Estimation engine ${ENGINE_VERSION}`;
-renderOverview(); renderDeviceTable(); renderReferences(); generateDeviceCatalog(customs); renderMatrix(); renderStatesDashboard(); populateSelectors();
+$("#hw-device").innerHTML = allDevices().map((device) => `<option value="${esc(device.id)}">${esc(device.name)}</option>`).join("");
+$("#hw-device").value = "rp2040";
+$("#hw-algo").innerHTML = algorithms.map((algo) => `<option value="${esc(algo.id)}">${esc(algo.name)}</option>`).join("");
+$("#hw-algo").value = "ml-kem-512";
+renderOverview(); renderDeviceTable(); renderReferences(); generateDeviceCatalog(customs); renderMatrix(); renderStatesDashboard(); populateSelectors(); renderHardwareSim();

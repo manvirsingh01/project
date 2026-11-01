@@ -42,6 +42,8 @@ cv_percent,              // sign operation only
 p99_ms,                  // sign operation only
 mwc_verdict,
 confidence_tier,
+data_source,             // literature-anchor | extrapolated | measured-live
+device_firmware_hash,    // populated for measured-live rows
 source_citation
 ```
 
@@ -74,6 +76,10 @@ not provide a numeric anchor; it is intentionally not replaced with a guess"*):
   source report → `time_ms = null`, `confidence_tier = unsupported`, same "no published figure"
   note.
 - `keygen` rows for ML-DSA: same treatment — no published per-phase figure, `null` with a note.
+
+Live rows are appended when an imported hardware result matches the selected device and algorithm.
+They carry the measured operation, mean/variance fields, `confidence_tier = measured-live`,
+firmware build hash, and capture timestamp in the note.
 
 This keeps the export truthful: a spreadsheet user filtering to `operation = keygen` sees
 clearly that those cells are empty-by-source, not zero or omitted, and can tell at a glance
